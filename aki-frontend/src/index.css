@@ -1,0 +1,183 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+body {
+  font-family: 'Poppins', sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #070b12;
+  color: #fff;
+  font-family: "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans",
+    "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.syne {
+  font-family: "Poppins", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans";
+}
+
+.font-800 {
+  font-weight: 800;
+}
+
+.font-700 {
+  font-weight: 700;
+}
+
+.app-shell {
+  position: relative;
+  min-height: 100%;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 78% 10%, rgba(239, 68, 68, 0.18), transparent 36%),
+    radial-gradient(circle at 14% 86%, rgba(59, 130, 246, 0.14), transparent 38%),
+    linear-gradient(180deg, #070b12 0%, #0b1220 45%, #070b12 100%);
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: linear-gradient(to bottom, #000, transparent 62%);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+}
+
+.glass-sm {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.gi {
+  background: rgba(255, 255, 255, 0.07) !important;
+  color: #fff !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+
+.gi::placeholder {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+.gi:focus {
+  outline: none !important;
+  border-color: rgba(239, 68, 68, 0.65) !important;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.18) !important;
+}
+
+select.gi {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 14px center !important;
+  padding-right: 40px !important;
+  cursor: pointer;
+}
+
+select.gi option {
+  background: #0b1220;
+  color: #fff;
+}
+
+.fade {
+  animation: fadeUp 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.role-card {
+  transition: all 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.role-card:hover {
+  transform: translateY(-8px);
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.brand-logo {
+  max-width: 150px;
+  max-height: 46px;
+  object-fit: contain;
+}
+
+@media (max-width: 720px) {
+  .brand-logo {
+    max-width: 116px;
+    max-height: 34px;
+  }
+
+  .product-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 3px;
+}
