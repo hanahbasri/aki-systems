@@ -4,7 +4,7 @@ import { supabase } from "./supabaseClient.js";
 
 export function LoginPage({ onLogin }) {
   const [tab, setTab] = useState("login");
-  const [form, setForm] = useState({ email: "", password: "", full_name: "", role: "striker" });
+  const [form, setForm] = useState({ email: "", password: "", full_name: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -255,13 +255,6 @@ export function LoginPage({ onLogin }) {
                     <button type="button" onClick={() => setShowPassword((v) => !v)} className="text-[11px] text-white/45 transition hover:text-white/80" style={{ fontWeight: 500 }}>{showPassword ? "Sembunyikan" : "Tampilkan"}</button>
                   </div>
                   <input type={showPassword ? "text" : "password"} placeholder="Minimal 8 karakter" autoComplete="new-password" disabled={loading} {...f("password")} className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white placeholder-white/20 focus:border-red-500 focus:bg-white/10 focus:outline-none transition-all disabled:opacity-60" required />
-                </div>
-                <div>
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-widest text-white/50" style={{ fontFamily: "'DM Sans', sans-serif" }}>Role</div>
-                  <select disabled={loading} {...f("role")} className="w-full rounded-xl bg-white/5 border border-white/10 px-4 py-3 text-sm text-white focus:border-red-500 focus:bg-[#1a1a1a] focus:outline-none transition-all disabled:opacity-60 appearance-none">
-                    <option value="striker" className="bg-gray-900">Striker (Sales / AM)</option>
-                    <option value="solution" className="bg-gray-900">Solution & Offering</option>
-                  </select>
                 </div>
 
                 <button type="submit" disabled={loading} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-red-700 py-3 text-sm text-white transition-all hover:bg-red-600 active:scale-[0.98] shadow-lg shadow-red-900/20 disabled:opacity-50" style={{ fontWeight: 600 }}>

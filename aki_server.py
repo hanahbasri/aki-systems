@@ -63,7 +63,7 @@ def get_current_user(req):
             profile_data = {
                 "id": user.user.id,
                 "full_name": meta.get("full_name") or meta.get("name") or "",
-                "role": meta.get("role") or "striker",
+                "role": meta.get("role") or "solution",
             }
 
         return user.user, profile_data
@@ -230,17 +230,14 @@ def register():
             "options": {
                 "data": {
                     "full_name": data.get("full_name", ""),
-                    "role": data.get("role", "striker"),
                 }
             }
         })
         if res.user:
-            # Update profile with extra fields
             supabase.table("profiles").update({
                 "nik": data.get("nik"),
                 "jabatan": data.get("jabatan"),
                 "unit": data.get("unit"),
-                "role": data.get("role", "striker"),
             }).eq("id", res.user.id).execute()
 
         return jsonify({"ok": True, "message": "Registrasi berhasil, cek email untuk verifikasi"})
@@ -290,10 +287,10 @@ def calculate():
         result = calculate_aki(aki_input)
         serialized = _serialize_result(result)
 
-        # Auto-save if solution role
+        # Auto-save for all authenticated users
         sub_id = None
         profile = request.current_profile
-        if profile.get("role") in ("solution", "manager") and data.get("save", True):
+        if data.get("save", True):
             sub_id = _save_submission(data, result, profile["id"], data.get("products", []))
 
         return jsonify({"ok": True, "result": serialized, "submission_id": sub_id})
@@ -350,17 +347,9 @@ def get_submissions():
     """Get submissions list based on role."""
     try:
         profile = request.current_profile
-        role = profile.get("role")
         status = request.args.get("status")
 
-        query = supabase.table("aki_submissions_view").select("*").order("created_at", desc=True)
-
-        if role == "striker":
-            query = query.eq("created_by", profile["id"])
-        elif role == "solution":
-            # Solution sees all submitted + their own
-            pass  # RLS handles this
-        # manager sees all
+        query = supabase.table("aki_submissions_view").select("*").eq("created_by", profile["id"]).order("created_at", desc=True)
 
         if status:
             query = query.eq("status", status)
@@ -385,7 +374,7 @@ def get_submission(sub_id):
 
 
 @app.route("/api/submissions/<sub_id>/submit", methods=["POST"])
-@require_auth(roles=["striker", "solution"])
+@require_auth()
 def submit_for_approval(sub_id):
     """Submit AKI to manager for approval."""
     try:
@@ -408,7 +397,7 @@ def submit_for_approval(sub_id):
 
 
 @app.route("/api/submissions/<sub_id>/review", methods=["POST"])
-@require_auth(roles=["manager"])
+@require_auth()
 def review_submission(sub_id):
     """Manager approve or reject submission."""
     try:
