@@ -19,3 +19,5 @@ aki-frontend/dist/
 .idea/
 *.swp
 .DS_Store
+.claude/
+node_modules/
