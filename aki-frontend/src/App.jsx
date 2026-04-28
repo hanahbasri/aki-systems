@@ -21,13 +21,29 @@ export default function AKIApp() {
     const storedUser = getStoredUser();
     return token && storedUser ? storedUser : null;
   });
+
+  const [authCallbackError, setAuthCallbackError] = useState(() => {
+    const hash = window.location.hash;
+    if (!hash.includes("error=")) return "";
+    const params = new URLSearchParams(hash.slice(1));
+    const code = params.get("error_code");
+    if (code === "otp_expired") return "Link verifikasi sudah kadaluarsa. Silakan login jika akun sudah aktif, atau daftar ulang.";
+    const desc = params.get("error_description");
+    return desc ? desc.replace(/\+/g, " ") : "Terjadi kesalahan verifikasi email.";
+  });
+
+  useEffect(() => {
+    if (authCallbackError) window.history.replaceState({}, "", window.location.pathname);
+  }, [authCallbackError]);
   const [showExitModal, setShowExitModal] = useState(false);
-  const [page, setPage] = useState("dashboard");
-  const [history, setHistory] = useState(() => readStorage(HISTORY_KEY, []));
+  const [page, setPage] = useState("home");
+  const [history, setHistory] = useState([]);
+  const [cameFromHistory, setCameFromHistory] = useState(false);
   const [role, setRole] = useState(() => readStorage(ROLE_KEY, "solution"));
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [apiAvailable, setApiAvailable] = useState(false);
+  const [calcWarning, setCalcWarning] = useState("");
 
   const [form, setForm] = useState({
     nama_program: "", nama_customer: "", cust_group: "", lokasi: "",
@@ -40,7 +56,7 @@ export default function AKIApp() {
   const [result, setResult] = useState(null);
   const [recos, setRecos] = useState(null);
   const [recoLoading, setRecoLoading] = useState(false);
-  const [excelLoading, setExcelLoading] = useState(false);
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   const kontrakBulan = form.kontrak_tahun * 12;
 
@@ -55,9 +71,29 @@ export default function AKIApp() {
       if (!session?.access_token) return;
       setStoredToken(session.access_token);
 
-      const me = await apiFetch("/auth/me").catch(() => null);
-      const profile = me?.profile || null;
+      let me = await apiFetch("/auth/me").catch(() => null);
 
+      // Token ditolak server — coba refresh sekali
+      if (!me?.ok) {
+        try {
+          const { data: refreshData } = await supabase.auth.refreshSession();
+          if (refreshData?.session?.access_token) {
+            setStoredToken(refreshData.session.access_token);
+            me = await apiFetch("/auth/me").catch(() => null);
+          }
+        } catch {
+          me = null;
+        }
+      }
+
+      // Setelah refresh masih gagal → paksa logout
+      if (!me?.ok) {
+        clearToken();
+        setUser(null);
+        return;
+      }
+
+      const profile = me.profile || null;
       const nextUser = {
         id: session.user?.id,
         email: session.user?.email,
@@ -70,13 +106,20 @@ export default function AKIApp() {
 
     supabase.auth.getSession().then(({ data }) => {
       const session = data?.session;
-      if (session) syncFromSession(session);
+      if (session) {
+        syncFromSession(session);
+      } else {
+        // Tidak ada session valid (expired) → clear dan paksa login ulang
+        clearToken();
+        setUser(null);
+      }
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
         syncFromSession(session);
-      } else if (event === "SIGNED_OUT") {
+      } else {
+        // Handles SIGNED_OUT, TOKEN_REFRESH_FAILED, dll
         clearToken();
         setUser(null);
       }
@@ -87,8 +130,41 @@ export default function AKIApp() {
     };
   }, []);
 
+  const historyKeyForUser = (targetUser) => {
+    // Gunakan email sebagai identitas utama (konsisten antara login Supabase & email/password).
+    const keyId = targetUser?.email || targetUser?.profile?.email || targetUser?.id || targetUser?.profile?.id || "guest";
+    return `${HISTORY_KEY}_${keyId}`;
+  };
+
+  useEffect(() => {
+    // Bersihkan legacy global history key satu kali agar tidak bocor antar akun.
+    try {
+      localStorage.removeItem(HISTORY_KEY);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setHistory([]);
+      return;
+    }
+
+    const userHistoryKey = historyKeyForUser(user);
+    const perUserHistory = readStorage(userHistoryKey, null);
+
+    if (Array.isArray(perUserHistory)) {
+      setHistory(perUserHistory);
+    } else {
+      setHistory([]);
+      writeStorage(userHistoryKey, []);
+    }
+  }, [user]);
+
   const handleLogin = (nextUser) => {
     setUser(nextUser);
+    setPage("home");
     setRole(readStorage(ROLE_KEY, "solution"));
   };
 
@@ -109,6 +185,7 @@ export default function AKIApp() {
   };
 
   const persistHistory = (nextResult) => {
+    if (!user) return;
     const entry = {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       createdAt: new Date().toISOString(),
@@ -121,7 +198,7 @@ export default function AKIApp() {
     };
     const nextHistory = [entry, ...history].slice(0, 30);
     setHistory(nextHistory);
-    writeStorage(HISTORY_KEY, nextHistory);
+    writeStorage(historyKeyForUser(user), nextHistory);
   };
 
   const setRolePersist = (nextRole) => {
@@ -141,12 +218,13 @@ export default function AKIApp() {
     setResult(item.result || null);
     setRecos(null);
     setStep(3);
+    setCameFromHistory(true);
     setPage("dashboard");
   };
 
   const clearHistory = () => {
     setHistory([]);
-    writeStorage(HISTORY_KEY, []);
+    if (user) writeStorage(historyKeyForUser(user), []);
   };
 
   const updateProduct = (i, key, val) => {
@@ -170,36 +248,49 @@ export default function AKIApp() {
   });
 
   const handleCalculate = async () => {
-    setLoading(true); setResult(null); setRecos(null);
+    setLoading(true);
+    setResult(null);
+    setRecos(null);
     try {
-      if (apiAvailable) {
-        const data = await apiFetch("/calculate", {
-          method: "POST",
-          body: JSON.stringify(buildPayload()),
-        });
-        if (data?.ok) {
-          setResult(data.result);
-          persistHistory(data.result);
-        } else {
-          if (data?.error === "Unauthorized") handleLogout();
-          alert(data?.error || "Gagal menghitung AKI");
-        }
-      } else {
-        const prev = calcPreview(products, kontrakBulan);
-        const previewResult = {
-          total_revenue: prev.rev, total_cogs: prev.cogs,
-          total_gross_profit: prev.gp, total_opex: prev.opex,
-          total_ebit: prev.ebit, total_ni: prev.ni,
-          gpm_ok: prev.gpm >= 0.07, nim_ok: prev.nim >= 0.02, npv_ok: prev.npv > 0,
-          irr_ok: false, pp_ok: false, npv: prev.npv, mirr: null,
-          payback_str: "N/A (offline mode)", layak: prev.layak,
-          gpm: prev.gpm, nim: prev.nim, capex_total: 0,
-          rev_by_year: [prev.rev, 0, 0, 0, 0], ni_by_year: [prev.ni, 0, 0, 0, 0],
-          fcf_by_year: [prev.ni, 0, 0, 0, 0],
-        };
-        setResult(previewResult);
-        persistHistory(previewResult);
+      const data = await apiFetch("/calculate", {
+        method: "POST",
+        body: JSON.stringify(buildPayload()),
+      });
+
+      if (data?.ok) {
+        setResult(data.result);
+        persistHistory(data.result);
+        return;
       }
+
+      if (data?.error === "Unauthorized") {
+        handleLogout();
+        return;
+      }
+
+      if (data?.error) {
+        alert(`Perhitungan gagal. Silakan cek input/koneksi. Detail: ${data.error}`);
+        return;
+      }
+
+      throw new Error("API calculate tidak merespons sesuai format");
+    } catch {
+      const prev = calcPreview(products, kontrakBulan, capex, form.om_pct, form.start_month);
+      const previewResult = {
+        total_revenue: prev.total_revenue, total_cogs: prev.total_cogs,
+        total_gross_profit: prev.total_gross_profit, total_opex: prev.total_opex,
+        total_ebitda: prev.total_ebitda, total_dep: prev.total_dep, total_tax: prev.total_tax,
+        total_ebit: prev.total_ebit, total_ni: prev.total_ni,
+        gpm_ok: prev.gpm_ok, nim_ok: prev.nim_ok, npv_ok: prev.npv_ok,
+        irr_ok: prev.irr_ok, pp_ok: prev.pp_ok, npv: prev.npv, mirr: prev.mirr,
+        payback: prev.payback, payback_str: prev.payback_str, layak: prev.layak,
+        gpm: prev.gpm, nim: prev.nim, capex_total: prev.capex_total,
+        rev_by_year: prev.rev_by_year, dir_by_year: prev.dir_by_year, opx_by_year: prev.opx_by_year,
+        ni_by_year: prev.ni_by_year, dep_by_year: prev.dep_by_year, fcf_by_year: prev.fcf_by_year,
+      };
+      setResult(previewResult);
+      persistHistory(previewResult);
+      setCalcWarning("Menampilkan hasil estimasi (offline), bukan hasil final AKI.");
     } finally { setLoading(false); }
   };
 
@@ -217,10 +308,10 @@ export default function AKIApp() {
     } finally { setRecoLoading(false); }
   };
 
-  const handleExportExcel = async () => {
-    setExcelLoading(true);
+  const handleExportPdf = async () => {
+    setPdfLoading(true);
     try {
-      const res = await apiFetchRaw("/export-excel", {
+      const res = await apiFetchRaw("/export-pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload()),
@@ -228,17 +319,17 @@ export default function AKIApp() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         if (err?.error === "Unauthorized") handleLogout();
-        alert(`Gagal generate Excel: ${err.error || res.statusText}`);
+        alert(`Gagal generate PDF: ${err.error || res.statusText}`);
         return;
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `AKI_${form.nama_customer || "output"}.xlsx`; a.click();
+      a.href = url; a.download = `AKI_${form.nama_customer || "output"}.pdf`; a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
       alert(`Error: ${e.message}`);
-    } finally { setExcelLoading(false); }
+    } finally { setPdfLoading(false); }
   };
 
   const hasProducts = products.some(p => p.product);
@@ -288,7 +379,7 @@ export default function AKIApp() {
   );
 
   // ── Routing ───────────────────────────────────────────────────────────────
-  if (!user) return <LoginPage onLogin={handleLogin} />;
+  if (!user) return <LoginPage onLogin={handleLogin} initialError={authCallbackError} onErrorClear={() => setAuthCallbackError("")} />;
 
   if (page === "history") return (
     <HalamanRiwayat
@@ -303,6 +394,17 @@ export default function AKIApp() {
     />
   );
 
+  const handleStartNew = () => {
+    setForm({ nama_program: "", nama_customer: "", cust_group: "", lokasi: "", kontrak_tahun: 1, start_month: 1, om_pct: 0.12 });
+    setProducts([{ product: null, qty: 1, tipe: "Butuh JT" }]);
+    setCapex({ material: "", jasa: "", lifetime_years: 5 });
+    setResult(null);
+    setRecos(null);
+    setStep(0);
+    setCameFromHistory(false);
+    setPage("dashboard");
+  };
+
   if (page === "home") return (
     <HalamanBeranda
       user={user}
@@ -310,9 +412,7 @@ export default function AKIApp() {
       page={page}
       setPage={setPage}
       setShowExitModal={setShowExitModal}
-      setStep={setStep}
-      setResult={setResult}
-      setRecos={setRecos}
+      onStartNew={handleStartNew}
       exitModalUI={exitModalUI}
     />
   );
@@ -337,7 +437,7 @@ export default function AKIApp() {
       result={result}
       recos={recos}
       recoLoading={recoLoading}
-      excelLoading={excelLoading}
+      pdfLoading={pdfLoading}
       loading={loading}
       hasProducts={hasProducts}
       steps={steps}
@@ -347,10 +447,13 @@ export default function AKIApp() {
       kontrakBulan={kontrakBulan}
       handleCalculate={handleCalculate}
       handleGetRecos={handleGetRecos}
-      handleExportExcel={handleExportExcel}
+      handleExportPdf={handleExportPdf}
       updateProduct={updateProduct}
       exitModalUI={exitModalUI}
       apiAvailable={apiAvailable}
+      calcWarning={calcWarning}
+      cameFromHistory={cameFromHistory}
+      setCameFromHistory={setCameFromHistory}
     />
   );
 }

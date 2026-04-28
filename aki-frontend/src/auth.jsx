@@ -2,11 +2,11 @@ import { useState } from "react";
 import { apiFetch, setToken, setUser } from "./authClient.js";
 import { supabase } from "./supabaseClient.js";
 
-export function LoginPage({ onLogin }) {
+export function LoginPage({ onLogin, initialError = "", onErrorClear }) {
   const [tab, setTab] = useState("login");
   const [form, setForm] = useState({ email: "", password: "", full_name: "" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(initialError);
   const [success, setSuccess] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [oauthLoading, setOauthLoading] = useState(false);
@@ -47,7 +47,7 @@ export function LoginPage({ onLogin }) {
         body: JSON.stringify(form),
       });
       if (data.ok) {
-        setSuccess("Registrasi berhasil! Cek email untuk verifikasi, lalu login.");
+        setSuccess("Registrasi berhasil! Silakan login dengan akun yang baru dibuat.");
         setTab("login");
       } else {
         setError(data.error || "Registrasi gagal");
@@ -144,7 +144,7 @@ export function LoginPage({ onLogin }) {
                 <button
                   key={t}
                   type="button"
-                  onClick={() => { setTab(t); setError(""); setSuccess(""); }}
+                  onClick={() => { setTab(t); setError(""); setSuccess(""); onErrorClear?.(); }}
                   className={`flex-1 rounded-lg py-2.5 text-sm transition-all ${tab === t ? "bg-red-700 text-white shadow-lg" : "text-white/50 hover:text-white"}`}
                   style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}
                 >

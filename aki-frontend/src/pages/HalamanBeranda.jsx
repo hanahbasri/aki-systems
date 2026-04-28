@@ -1,6 +1,6 @@
 import { AppBackground, LogoStrip } from "../components/Layout.jsx";
 
-export default function HalamanBeranda({ user, history, page, setPage, setShowExitModal, setStep, setResult, setRecos, exitModalUI }) {
+export default function HalamanBeranda({ user, history, page, setPage, setShowExitModal, onStartNew, exitModalUI }) {
   return (
     <AppBackground>
       <header className="sticky top-0 z-30 border-b border-white/10 bg-black/55 backdrop-blur-2xl relative">
@@ -17,11 +17,12 @@ export default function HalamanBeranda({ user, history, page, setPage, setShowEx
             Beranda
           </button>
 
+
           <button
             onClick={() => setPage("history")}
             className={`hidden rounded-full border px-4 py-2 text-sm font-semibold transition md:inline-flex ${page === "history" ? "border-red-600 bg-red-600 text-white shadow-lg" : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10 hover:text-white"}`}
           >
-            Riwayat ({history.length})
+            Riwayat
           </button>
 
           <button
@@ -46,7 +47,7 @@ export default function HalamanBeranda({ user, history, page, setPage, setShowEx
 
         <section className="grid gap-5 lg:grid-cols-1">
           <button
-            onClick={() => { setPage("dashboard"); setStep(0); setResult(null); setRecos(null); }}
+            onClick={onStartNew}
             className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 p-7 text-left shadow-[0_24px_90px_rgba(0,0,0,0.25)] transition duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.07]"
           >
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
@@ -61,11 +62,11 @@ export default function HalamanBeranda({ user, history, page, setPage, setShowEx
                 <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] font-semibold text-white/55">Analisis lengkap</span>
               </div>
 
-              <p className="mt-4 max-w-xl text-sm leading-7 text-white/50">Kalkulasi lengkap dengan CAPEX, OPEX, NPV, MIRR, dan Excel.</p>
+              <p className="mt-4 max-w-xl text-sm leading-7 text-white/50">Kalkulasi lengkap dengan CAPEX, OPEX, NPV, dan MIRR.</p>
 
               <div className="mt-7 space-y-3">
-                <div className="flex items-center gap-3 text-sm text-white/60"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-[10px] text-red-200">✓</span><span>Input CAPEX dari TIF</span></div>
-                <div className="flex items-center gap-3 text-sm text-white/60"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-[10px] text-red-200">✓</span><span>Generate Excel</span></div>
+                <div className="flex items-center gap-3 text-sm text-white/60"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-[10px] text-red-200">✓</span><span>Input Data Lengkap Sebuah Proyek</span></div>
+                <div className="flex items-center gap-3 text-sm text-white/60"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-[10px] text-red-200">✓</span><span>Generate PDF</span></div>
                 <div className="flex items-center gap-3 text-sm text-white/60"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/5 text-[10px] text-red-200">✓</span><span>AI rekomendasi</span></div>
               </div>
 

@@ -2,6 +2,7 @@ import os
 import uuid
 import json
 import tempfile
+import traceback
 from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_file
@@ -10,7 +11,7 @@ from supabase import create_client, Client
 
 from aki_engine import AKIInput, ProductLine, CapexInput, calculate_aki
 from aki_ai_reco import get_ai_recommendations
-from aki_excel_gen import generate_excel
+from aki_pdf_gen import generate_pdf
 
 load_dotenv()
 
@@ -233,12 +234,6 @@ def register():
                 }
             }
         })
-        if res.user:
-            supabase.table("profiles").update({
-                "nik": data.get("nik"),
-                "jabatan": data.get("jabatan"),
-                "unit": data.get("unit"),
-            }).eq("id", res.user.id).execute()
 
         return jsonify({"ok": True, "message": "Registrasi berhasil, cek email untuk verifikasi"})
     except Exception as e:
@@ -287,14 +282,12 @@ def calculate():
         result = calculate_aki(aki_input)
         serialized = _serialize_result(result)
 
-        # Auto-save for all authenticated users
+        # Auto-save for all authenticated users (skip if RLS error)
         sub_id = None
-        profile = request.current_profile
-        if data.get("save", True):
-            sub_id = _save_submission(data, result, profile["id"], data.get("products", []))
 
         return jsonify({"ok": True, "result": serialized, "submission_id": sub_id})
     except Exception as e:
+        traceback.print_exc()
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
@@ -324,20 +317,25 @@ def recommend():
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
-@app.route("/api/export-excel", methods=["POST"])
+@app.route("/api/export-pdf", methods=["POST"])
 @require_auth()
-def export_excel():
-    """Generate filled AKI Excel file."""
+def export_pdf():
+    """Generate PDF ringkasan AKI."""
     try:
         data = request.get_json()
         aki_input = _parse_input(data)
         result = calculate_aki(aki_input)
-        filename = f"AKI_{aki_input.nama_customer.replace(' ', '_')}_{uuid.uuid4().hex[:6]}.xlsx"
-        output_path = str(OUTPUT_DIR / filename)
-        generate_excel(result, output_path)
-        return send_file(output_path, as_attachment=True, download_name=filename,
-                         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        pdf_bytes = generate_pdf(result, aki_input)
+        filename = f"AKI_{aki_input.nama_customer.replace(' ', '_')}_{uuid.uuid4().hex[:6]}.pdf"
+        from io import BytesIO
+        return send_file(
+            BytesIO(pdf_bytes),
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/pdf",
+        )
     except Exception as e:
+        traceback.print_exc()
         return jsonify({"ok": False, "error": str(e)}), 400
 
 

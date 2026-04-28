@@ -132,11 +132,24 @@ function RecoCard({ reco }) {
 export default function HalamanInput({
   user, page, setPage, setShowExitModal,
   form, setForm, products, setProducts, capex, setCapex,
-  result, recos, recoLoading, excelLoading, loading,
+  result, recos, recoLoading, pdfLoading, loading,
   hasProducts, steps, step, setStep, isLastStep, kontrakBulan,
-  handleCalculate, handleGetRecos, handleExportExcel, updateProduct,
-  exitModalUI, apiAvailable,
+  handleCalculate, handleGetRecos, handleExportPdf, updateProduct,
+  exitModalUI, apiAvailable, calcWarning,
+  cameFromHistory, setCameFromHistory,
 }) {
+  const handleBack = () => {
+    if (isLastStep) {
+      setCameFromHistory?.(false);
+      setPage("home");
+      return;
+    }
+    if (step === 0) {
+      setPage("home");
+      return;
+    }
+    setStep(s => s - 1);
+  };
   return (
     <AppBackground>
       {/* Header */}
@@ -175,9 +188,11 @@ export default function HalamanInput({
               <button onClick={() => setPage("home")} className={`hidden rounded-full border px-4 py-2 text-sm font-semibold transition md:inline-flex ${page === "home" ? "border-red-600 bg-red-600 text-white shadow-lg" : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10 hover:text-white"}`}>
                 Beranda
               </button>
-              <button onClick={() => setPage("history")} className={`hidden rounded-full border px-4 py-2 text-sm font-semibold transition md:inline-flex ${page === "history" ? "border-red-600 bg-red-600 text-white shadow-lg" : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10 hover:text-white"}`}>
-                Riwayat
-              </button>
+              {isLastStep && (
+                <button onClick={() => setPage("history")} className={`hidden rounded-full border px-4 py-2 text-sm font-semibold transition md:inline-flex ${page === "history" ? "border-red-600 bg-red-600 text-white shadow-lg" : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10 hover:text-white"}`}>
+                  Riwayat
+                </button>
+              )}
               <button onClick={() => setShowExitModal(true)} className="hidden rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 hover:text-red-300 md:inline-flex">
                 Keluar
               </button>
@@ -338,6 +353,12 @@ export default function HalamanInput({
               </div>
             ) : (
               <>
+                {calcWarning && (
+                  <div className="glass-sm rounded-xl px-4 py-3 text-xs text-amber-300/90"
+                    style={{ borderColor: "rgba(245,158,11,0.25)" }}>
+                    ⚠️ {calcWarning}
+                  </div>
+                )}
                 {/* Summary Proyek */}
                 <div className="glass rounded-2xl p-6">
                   <h3 className="syne font-700 text-white mb-4">Ringkasan Proyek</h3>
@@ -357,17 +378,50 @@ export default function HalamanInput({
                   </div>
                   <div>
                     <div className="text-xs text-white/30 uppercase tracking-wider font-semibold mb-2">Produk</div>
-                    <div className="space-y-1.5">
+                    <div className="rounded-xl border border-white/8 overflow-hidden text-sm">
                       {products.filter(p => p.product).map((p, i) => (
-                        <div key={i} className="flex items-center justify-between glass-sm rounded-lg px-3 py-2 text-sm">
-                          <span className="text-white/80">{p.product.value}</span>
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="text-white/40">×{p.qty}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${p.tipe === "Butuh JT" ? "bg-red-500/15 text-red-300/80" : "bg-white/5 text-white/40"}`}>{p.tipe}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${p.product.isHSI ? "bg-orange-500/15 text-orange-300/70" : "bg-white/5 text-white/35"}`}>{p.product.isHSI ? "HSI" : "Non-HSI"}</span>
+                        <div key={i} className="flex items-start justify-between px-3 py-2.5 border-b border-white/5 last:border-b-0">
+                          <div className="flex-1 min-w-0 pr-3">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-white/80">{p.product.value}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${p.product.isHSI ? "bg-orange-500/15 text-orange-300/70" : "bg-white/5 text-white/35"}`}>
+                                {p.product.isHSI ? "HSI" : "Non-HSI"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5 text-xs text-white/35">
+                              <span>×{p.qty} {p.product.satuan}</span>
+                              <span className={p.tipe === "Butuh JT" ? "text-red-300/60" : ""}>{p.tipe}</span>
+                              {p.product.otc > 0 && (
+                                <span>OTC: Rp {fmt(p.product.otc * p.qty)}</span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <div className="font-mono text-white/75">
+                              Rp {fmt(p.product.bulanan * p.qty)}<span className="text-white/30 text-xs">/bln</span>
+                            </div>
+                            {p.qty > 1 && (
+                              <div className="text-white/30 text-xs mt-0.5">@ Rp {fmt(p.product.bulanan)}/unit</div>
+                            )}
                           </div>
                         </div>
                       ))}
+                      {/* Total baris */}
+                      {(() => {
+                        const totalBulanan = products.filter(p => p.product).reduce((s, p) => s + p.product.bulanan * p.qty, 0);
+                        const totalOTC = products.filter(p => p.product).reduce((s, p) => s + p.product.otc * p.qty, 0);
+                        return (
+                          <div className="flex items-center justify-between px-3 py-2.5 bg-white/[0.03] border-t border-white/10">
+                            <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Total Recurring</span>
+                            <div className="text-right">
+                              <span className="font-mono font-semibold text-white/80">Rp {fmt(totalBulanan)}<span className="text-white/30 text-xs font-normal">/bln</span></span>
+                              {totalOTC > 0 && (
+                                <div className="text-xs text-white/35 mt-0.5">+ OTC Rp {fmt(totalOTC)}</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -453,7 +507,12 @@ export default function HalamanInput({
                   {/* Key Metrics */}
                   <div className="grid gap-3 md:grid-cols-3">
                     <MetricCard label="NPV (WACC 11.35%)" value={result.npv != null ? `Rp ${fmt(result.npv)}` : "—"} ok={result.npv_ok} threshold="NPV > 0" />
-                    <MetricCard label="MIRR" value={result.mirr != null ? fmtPct(result.mirr) : "N/A"} ok={result.irr_ok} threshold="Min 13.35%" />
+                    <MetricCard
+                      label="MIRR"
+                      value={result.mirr != null ? fmtPct(result.mirr) : "Belum balik modal / cashflow tidak valid"}
+                      ok={result.mirr != null ? result.irr_ok : false}
+                      threshold="Min 13.35%"
+                    />
                     <MetricCard label="Payback Period" value={result.payback_str} ok={result.pp_ok} threshold={`< ${form.kontrak_tahun} Tahun`} />
                   </div>
                 </div>
@@ -464,10 +523,10 @@ export default function HalamanInput({
                     className="px-4 py-2.5 glass rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2">
                     🔄 Hitung Ulang
                   </button>
-                  <button onClick={handleExportExcel} disabled={excelLoading || !apiAvailable}
+                  <button onClick={handleExportPdf} disabled={pdfLoading || !apiAvailable}
                     className="px-5 py-2.5 bg-emerald-700/80 border border-emerald-600/40 text-white rounded-xl text-sm font-semibold hover:bg-emerald-600/80 disabled:opacity-30 transition-all flex items-center gap-2">
-                    {excelLoading ? <span className="spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> : "📥"}
-                    Download Excel
+                    {pdfLoading ? <span className="spin inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full" /> : "📄"}
+                    Download PDF
                   </button>
                   {!result.layak && (
                     <button onClick={handleGetRecos} disabled={recoLoading || !apiAvailable}
@@ -485,12 +544,30 @@ export default function HalamanInput({
                     {recos.summary && (
                       <p className="text-sm text-white/60 mb-4 glass-sm rounded-xl p-3 leading-relaxed">{recos.summary}</p>
                     )}
-                    {recos.minimum_contract_months && (
-                      <div className="mb-4 glass-sm rounded-xl px-4 py-3 text-sm text-blue-300/80"
-                        style={{ borderColor: "rgba(96,165,250,0.2)" }}>
-                        📅 <strong className="text-blue-300">Kontrak minimum:</strong> {recos.minimum_contract_months} bulan
+
+                    {(recos.minimum_contract_months || recos.minimum_revenue_monthly || recos.notes) && (
+                      <div className="mb-4 space-y-2">
+                        {recos.minimum_contract_months && (
+                          <div className="glass-sm rounded-xl px-4 py-3 text-sm text-blue-300/80"
+                            style={{ borderColor: "rgba(96,165,250,0.2)" }}>
+                            📅 <strong className="text-blue-300">Kontrak minimal agar layak:</strong> {recos.minimum_contract_months} bulan
+                          </div>
+                        )}
+                        {recos.minimum_revenue_monthly && (
+                          <div className="glass-sm rounded-xl px-4 py-3 text-sm text-emerald-300/80"
+                            style={{ borderColor: "rgba(16,185,129,0.22)" }}>
+                            💵 <strong className="text-emerald-300">Estimasi revenue minimum per bulan:</strong> Rp {fmt(recos.minimum_revenue_monthly)}
+                          </div>
+                        )}
+                        {recos.notes && (
+                          <div className="glass-sm rounded-xl px-4 py-3 text-sm text-amber-300/85"
+                            style={{ borderColor: "rgba(245,158,11,0.25)" }}>
+                            ⚠️ <strong className="text-amber-300">Catatan:</strong> {recos.notes}
+                          </div>
+                        )}
                       </div>
                     )}
+
                     <div className="space-y-3">
                       {recos.recommendations?.map((r, i) => <RecoCard key={i} reco={r} />)}
                     </div>
@@ -505,7 +582,7 @@ export default function HalamanInput({
 
         {/* ── Navigasi ─────────────────────────────────────────────────── */}
         <div className="flex justify-between pt-2 pb-8">
-          <button onClick={() => step === 0 ? setPage("home") : setStep(s => s - 1)}
+          <button onClick={handleBack}
             className="px-5 py-2.5 glass rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/10 transition-all">
             ← Kembali
           </button>

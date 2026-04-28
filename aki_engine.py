@@ -21,7 +21,7 @@ WACC = 0.1135          # Confirmed from template
 TAX_RATE = 0.22        # Per template (22%)
 BOP_LAKWAS_PCT = 0.004 # 0.4% of CAPEX
 OM_DEFAULT_PCT = 0.12  # 12% of revenue per month (annual: varies by active months)
-COGS_PCT_NON_HSI = 0.30  # 30% COGS for non-HSI products
+COGS_PCT_NON_HSI = 0.70  # 70% COGS for non-HSI products
 MIN_NPV = 0            # NPV > 0
 MIN_IRR = WACC + 0.02  # 13.35%
 MIN_NIM = 0.02         # 2%
@@ -40,7 +40,7 @@ class ProductLine:
     otc_price: float       # One-time charge (OTC instalasi)
     is_hsi: bool           # True = HSI, no COGS
     satuan: str = "Titik"
-    tipe: str = "Butuh JT" # "Butuh JT" | "Tanpa JT" | "Existing"
+    tipe: str = "Butuh JT" # "Butuh JT" | "Tanpa JT"
 
 
 @dataclass
@@ -82,7 +82,7 @@ class AKIInput:
     # Products
     products: List[ProductLine]
 
-    # CAPEX (Solution only; Striker leaves None)
+
     capex: Optional[CapexInput] = None
 
     # OPEX parameter
@@ -161,8 +161,8 @@ def calculate_aki(inp: AKIInput) -> dict:
     # ── 3. Direct Cost / COGS (Sheet 4. Dir) ──────────────────────────────────
     # OTC instalasi COGS = 75% of OTC revenue (from template: 1875000/2500000)
     # Recurring COGS:
-    #   HSI    -> 0
-    #   Non-HSI -> 30% of recurring revenue
+    #   HSI     -> 0
+    #   Non-HSI -> 70% of recurring revenue
     dir_by_year = [0.0] * N_YEARS
     dir_lines = []
 
@@ -228,7 +228,10 @@ def calculate_aki(inp: AKIInput) -> dict:
     capex_outflow = [-capex_total if yr == 0 else 0.0 for yr in range(N_YEARS)]
 
     fcf_by_year = [
-        ni_by_year[yr] + dep_by_year[yr] + wc_change_by_year[yr] + capex_outflow[yr]
+        (ebit_by_year[yr] * (1 - TAX_RATE))
+        + dep_by_year[yr]
+        + wc_change_by_year[yr]
+        + capex_outflow[yr]
         for yr in range(N_YEARS)
     ]
 
@@ -237,6 +240,18 @@ def calculate_aki(inp: AKIInput) -> dict:
     for yr in range(N_YEARS):
         running += fcf_by_year[yr]
         acc_fcf.append(running)
+
+    print("=== DEBUG AKI ===")
+    print("Revenue:", rev_by_year)
+    print("COGS:", dir_by_year)
+    print("OPEX:", opx_by_year)
+    print("EBIT:", ebit_by_year)
+    print("NI:", ni_by_year)
+    print("DEP:", dep_by_year)
+    print("WC:", wc_change_by_year)
+    print("FCF:", fcf_by_year)
+    print("ACC FCF:", acc_fcf)
+    print("=================")
 
     # ── 8. NPV ─────────────────────────────────────────────────────────────────
     # Discount factors: 1/(1+WACC)^yr for yr=1..5
@@ -248,18 +263,22 @@ def calculate_aki(inp: AKIInput) -> dict:
     # Build cash flow array: [-capex_total, FCF_yr1, FCF_yr2, ...]
     # Note: template uses MIRR not pure IRR for verdict
     cf_for_irr = [-capex_total] + [
-        ni_by_year[yr] + dep_by_year[yr] + wc_change_by_year[yr]
+        (ebit_by_year[yr] * (1 - TAX_RATE))
+        + dep_by_year[yr]
+        + wc_change_by_year[yr]
         for yr in range(N_YEARS)
     ]
 
     irr = _calc_irr(cf_for_irr)
 
-    # MIRR: finance rate = WACC+2% (Penarikan JT default), reinvest rate = WACC
-    mirr = _calc_mirr(cf_for_irr, finance_rate=MIN_IRR, reinvest_rate=WACC)
+    # MIRR berbasis FCF aktual, finance & reinvest rate = WACC
+    mirr = _calc_mirr(fcf_by_year, finance_rate=WACC, reinvest_rate=WACC)
+    if mirr is None:
+        mirr = irr
 
     # ── 10. Payback Period ─────────────────────────────────────────────────────
     # Based on accumulated FCF crossing zero
-    payback = _calc_payback(fcf_by_year, capex_total)
+    payback = _calc_payback(fcf_by_year)
 
     # ── 11. Finance Charge & EVA (Sheet COM) ──────────────────────────────────
     finance_charge_by_year = [
@@ -271,7 +290,7 @@ def calculate_aki(inp: AKIInput) -> dict:
     npv_ok = npv > MIN_NPV
     irr_val = mirr if mirr is not None else irr
     irr_ok = irr_val is not None and irr_val > MIN_IRR
-    pp_ok = payback is not None and payback < (inp.kontrak_total_bulan / 12)
+    pp_ok = payback is not None and payback <= (inp.kontrak_total_bulan / 12)
     nim_ok = nim >= MIN_NIM
     gpm_ok = gpm >= MIN_GPM
 
@@ -401,30 +420,24 @@ def _npv(cashflows: List[float], rate: float) -> float:
     return sum(cf / (1 + rate) ** i for i, cf in enumerate(cashflows))
 
 
-def _calc_payback(fcf_by_year: List[float], capex: float) -> Optional[float]:
-    """
-    Payback period in years from accumulated FCF crossing zero.
-    CAPEX is already embedded in fcf_by_year[0] as a negative outflow.
-    So we simply accumulate FCF and find when it turns positive.
-    Returns fractional year (1-based: year 1 = first active year).
-    """
-    acc = 0.0
-    for yr, cf in enumerate(fcf_by_year):
-        prev = acc
-        acc += cf
-        if acc >= 0:
-            if cf != 0:
-                # Interpolate: how far into this year did we break even?
-                fraction = -prev / cf
-                return yr + fraction
-            else:
-                return float(yr + 1)
-    return None  # Not recovered within horizon
+def _calc_payback(fcf_by_year: List[float]) -> Optional[float]:
+    cumulative = 0.0
+    for i, fcf in enumerate(fcf_by_year):
+        prev = cumulative
+        cumulative += fcf
+
+        if cumulative >= 0:
+            if fcf == 0:
+                return i + 1
+            fraction = (0 - prev) / fcf
+            return i + fraction
+
+    return None
 
 
 def _format_pp(pp: Optional[float]) -> str:
     if pp is None:
-        return "Tidak Tercapai"
+        return "Belum balik modal (Payback > horizon)"
     if pp < 0:
         tahun = int(pp)
         bulan = round((pp - tahun) * 12)
@@ -439,44 +452,87 @@ def _format_pp(pp: Optional[float]) -> str:
 def build_reco_context(result: dict) -> str:
     """Build context string for AI recommendation when not layak."""
     inp: AKIInput = result["input"]
+    months = max(inp.kontrak_total_bulan, 1)
+
     issues = []
     if not result["npv_ok"]:
-        issues.append(f"NPV negatif ({result['npv']:,.0f} Rp) — investasi belum menguntungkan secara nilai sekarang")
+        issues.append(f"NPV negatif (Rp{result['npv']:,.0f}) — butuh NPV > 0")
     if not result["irr_ok"]:
-        mirr_str = f"{result['mirr']*100:.2f}%" if result["mirr"] else "N/A"
+        mirr_str = f"{result['mirr']*100:.2f}%" if result["mirr"] is not None else "N/A"
         issues.append(f"MIRR {mirr_str} di bawah minimum {result['min_irr']*100:.2f}%")
     if not result["pp_ok"]:
-        issues.append(f"Payback Period {result['payback_str']} melebihi masa kontrak {inp.kontrak_total_bulan} bulan")
+        issues.append(f"Payback Period {result['payback_str']} melebihi masa kontrak {months} bulan")
     if not result["gpm_ok"]:
         issues.append(f"GPM {result['gpm']*100:.1f}% di bawah minimum 7%")
     if not result["nim_ok"]:
         issues.append(f"NIM {result['nim']*100:.1f}% di bawah minimum 2%")
 
-    products_summary = "\n".join(
-        f"  - {p.name}: {p.qty} {p.satuan}, Rp{p.monthly_price:,.0f}/bln, OTC Rp{p.otc_price:,.0f}, {'HSI (no COGS)' if p.is_hsi else 'Non-HSI (COGS 30%)'}"
-        for p in inp.products
-    )
+    # Per-product breakdown
+    monthly_rev_total = result["total_revenue"] / months
+    products_lines = []
+    for p in inp.products:
+        contrib_monthly = p.qty * p.monthly_price
+        contrib_pct = (contrib_monthly / monthly_rev_total * 100) if monthly_rev_total > 0 else 0
+        products_lines.append(
+            f"  - [{('HSI' if p.is_hsi else 'Non-HSI')}] {p.name}: "
+            f"{p.qty} {p.satuan} × Rp{p.monthly_price:,.0f}/bln = Rp{contrib_monthly:,.0f}/bln ({contrib_pct:.1f}% revenue), "
+            f"OTC Rp{p.otc_price:,.0f}"
+        )
+    products_summary = "\n".join(products_lines)
+
+    # Gap analysis — berapa tambahan revenue bulanan yang dibutuhkan
+    cogs_ratio = result["total_cogs"] / result["total_revenue"] if result["total_revenue"] > 0 else 0.7
+    om_pct = float(getattr(inp, "om_pct", 0.12))
+    ni_margin = max(0.05, 1 - cogs_ratio - om_pct - 0.22 * max(0, 1 - cogs_ratio - om_pct))
+
+    npv_gap_monthly = 0
+    if not result["npv_ok"] and result["npv"] < 0:
+        npv_gap_monthly = int(math.ceil(abs(result["npv"]) / max(months * ni_margin, 1)))
+
+    nim_gap_monthly = 0
+    if not result["nim_ok"]:
+        target_ni_monthly = 0.02 * monthly_rev_total
+        current_ni_monthly = result["total_ni"] / months
+        nim_gap_monthly = int(math.ceil(max(0, target_ni_monthly - current_ni_monthly) / max(ni_margin, 0.01)))
+
+    min_contract_months = None
+    if not result["pp_ok"] and result["payback"] is not None:
+        min_contract_months = math.ceil(result["payback"] * 12) + 1
+
+    gap_lines = []
+    if npv_gap_monthly > 0:
+        gap_lines.append(f"  • Butuh tambahan revenue ≈ Rp{npv_gap_monthly:,.0f}/bln agar NPV positif")
+    if nim_gap_monthly > 0:
+        gap_lines.append(f"  • Butuh tambahan revenue ≈ Rp{nim_gap_monthly:,.0f}/bln agar NIM ≥ 2%")
+    if min_contract_months:
+        gap_lines.append(f"  • Kontrak minimal {min_contract_months} bulan agar Payback Period tercapai (saat ini {months} bulan)")
 
     ctx = f"""
 PROJECT: {inp.nama_program}
 CUSTOMER: {inp.nama_customer} ({inp.cust_group})
 LOKASI: {inp.lokasi}
-MASA KONTRAK: {inp.kontrak_total_bulan} bulan ({inp.kontrak_tahun} tahun {inp.kontrak_bulan} bulan)
+MASA KONTRAK: {months} bulan ({inp.kontrak_tahun} tahun {inp.kontrak_bulan} bulan)
+START BULAN: {inp.start_month}
+O&M PCT: {om_pct*100:.0f}%
 
-PRODUK:
+PRODUK (total {len(inp.products)} item, revenue bulanan saat ini Rp{monthly_rev_total:,.0f}/bln):
 {products_summary}
 
-CAPEX TOTAL: Rp{result['capex_total']:,.0f}
-TOTAL REVENUE: Rp{result['total_revenue']:,.0f}
-TOTAL COGS: Rp{result['total_cogs']:,.0f}
-GROSS PROFIT: Rp{result['total_gross_profit']:,.0f} (GPM: {result['gpm']*100:.1f}%)
-NET INCOME: Rp{result['total_ni']:,.0f} (NIM: {result['nim']*100:.1f}%)
-NPV: Rp{result['npv']:,.0f}
-MIRR: {f"{result['mirr']*100:.2f}%" if result['mirr'] else 'N/A'}
-PAYBACK PERIOD: {result['payback_str']}
+FINANSIAL:
+  CAPEX TOTAL       : Rp{result['capex_total']:,.0f}
+  TOTAL REVENUE     : Rp{result['total_revenue']:,.0f} (≈ Rp{monthly_rev_total:,.0f}/bln rata-rata)
+  TOTAL COGS        : Rp{result['total_cogs']:,.0f} (ratio {cogs_ratio*100:.1f}%)
+  GROSS PROFIT      : Rp{result['total_gross_profit']:,.0f} | GPM: {result['gpm']*100:.1f}% (min 7%)
+  NET INCOME        : Rp{result['total_ni']:,.0f} | NIM: {result['nim']*100:.1f}% (min 2%)
+  NPV               : Rp{result['npv']:,.0f} (min > 0)
+  MIRR              : {f"{result['mirr']*100:.2f}%" if result['mirr'] is not None else 'N/A'} (min {result['min_irr']*100:.2f}%)
+  PAYBACK PERIOD    : {result['payback_str']}
 
 MASALAH KELAYAKAN:
-{chr(10).join(f"  • {i}" for i in issues)}
+{chr(10).join(f"  • {i}" for i in issues) if issues else "  • Semua indikator LAYAK"}
+
+ANALISIS GAP (apa yang dibutuhkan agar layak):
+{chr(10).join(gap_lines) if gap_lines else "  • Tidak ada gap signifikan"}
 """
     return ctx.strip()
 
@@ -524,7 +580,7 @@ if __name__ == "__main__":
     print(f"CAPEX TOTAL     : Rp {result['capex_total']:>18,.0f}")
     print("-" * 60)
     print(f"NPV             : Rp {result['npv']:>18,.0f}  {'✓' if result['npv_ok'] else '✗'}")
-    mirr_disp = f"{result['mirr']*100:.2f}%" if result['mirr'] else "N/A"
+    mirr_disp = f"{result['mirr']*100:.2f}%" if result['mirr'] is not None else "N/A"
     print(f"MIRR            :    {mirr_disp:>17}  {'✓' if result['irr_ok'] else '✗'} (min {result['min_irr']*100:.2f}%)")
     print(f"PAYBACK PERIOD  :    {result['payback_str']:>17}  {'✓' if result['pp_ok'] else '✗'}")
     print(f"GPM             :    {result['gpm']*100:>16.1f}%  {'✓' if result['gpm_ok'] else '✗'} (min 7%)")
