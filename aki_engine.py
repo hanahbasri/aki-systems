@@ -31,6 +31,18 @@ N_YEARS = 5            # Projection horizon
 AR_DAYS = 60           # Account Receivable days
 AP_DAYS = 60           # Account Payable days
 
+PARENT_EVP = [
+    ("PSB Astinet", 0.25),
+    ("Astinet Fit IP/29", 0.20),
+    ("Astinet Fit IP/31", 0.30),
+    ("Add On IPv4 Astinet", 0.50),
+    ("IP Transit", 0.20),
+    ("VPN IP", 0.30),
+    ("Metro E", 0.30),
+    ("WMS", 0.30),
+    ("Astinet", 0.30),
+]
+
 
 @dataclass
 class ProductLine:
@@ -39,6 +51,7 @@ class ProductLine:
     monthly_price: float   # Harga bulanan (revenue per unit per bulan)
     otc_price: float       # One-time charge (OTC instalasi)
     is_hsi: bool           # True = HSI, no COGS
+    evp: Optional[float] = None  # EVP margin; recurring COGS = 1 - EVP
     satuan: str = "Titik"
     tipe: str = "Butuh JT" # "Butuh JT" | "Tanpa JT"
 
@@ -118,6 +131,38 @@ def distribute_months(total_bulan: int, start_month: int = 1) -> List[int]:
     return months
 
 
+def _normalize_evp(evp: Optional[float]) -> Optional[float]:
+    if evp is None:
+        return None
+    try:
+        value = float(evp)
+    except (TypeError, ValueError):
+        return None
+    if value < 0:
+        return None
+    return value / 100 if value > 1 else value
+
+
+def _resolve_parent_evp(name: str = "", group: str = "") -> Optional[float]:
+    haystack_name = name or ""
+    haystack_group = group or ""
+    for prefix, evp in PARENT_EVP:
+        if prefix in haystack_name or prefix in haystack_group:
+            return evp
+    return None
+
+
+def _recurring_cogs_ratio(prod: ProductLine) -> float:
+    if prod.is_hsi:
+        return 0.0
+    evp = _normalize_evp(prod.evp)
+    if evp is None:
+        evp = _resolve_parent_evp(prod.name)
+    if evp is not None:
+        return max(0.0, 1.0 - evp)
+    return COGS_PCT_NON_HSI
+
+
 # ── Core calculation ────────────────────────────────────────────────────────────
 def calculate_aki(inp: AKIInput) -> dict:
     """Full AKI calculation. Returns a dict mirroring all Excel sheets."""
@@ -162,7 +207,7 @@ def calculate_aki(inp: AKIInput) -> dict:
     # OTC instalasi COGS = 75% of OTC revenue (from template: 1875000/2500000)
     # Recurring COGS:
     #   HSI     -> 0
-    #   Non-HSI -> 70% of recurring revenue
+    #   Non-HSI -> based on EVP (fallback 70% if EVP unavailable)
     dir_by_year = [0.0] * N_YEARS
     dir_lines = []
 
@@ -171,10 +216,7 @@ def calculate_aki(inp: AKIInput) -> dict:
         for yr in range(N_YEARS):
             m = months_per_year[yr]
             otc_cost = (prod.otc_price * 0.75 * prod.qty) if yr == 0 else 0.0
-            if prod.is_hsi:
-                recurring_cost = 0.0
-            else:
-                recurring_cost = prod.monthly_price * prod.qty * m * COGS_PCT_NON_HSI
+            recurring_cost = prod.monthly_price * prod.qty * m * _recurring_cogs_ratio(prod)
             total_cost = otc_cost + recurring_cost
             line_dir.append(total_cost)
             dir_by_year[yr] += total_cost

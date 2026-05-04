@@ -70,6 +70,20 @@ const formatPayback = (pp) => {
   return `${tahun} Tahun ${Math.abs(bulan)} Bulan`;
 };
 
+const normalizeEvp = (evp) => {
+  if (evp == null || Number.isNaN(Number(evp))) return null;
+  const value = Number(evp);
+  if (value < 0) return null;
+  return value > 1 ? value / 100 : value;
+};
+
+const getRecurringCostRatio = (product) => {
+  if (!product || product.isHSI) return 0;
+  const evp = normalizeEvp(product.evp);
+  if (evp != null) return Math.max(0, 1 - evp);
+  return 0.70;
+};
+
 export function calcPreview(products, kontrakBulan, capex = { material: "", jasa: "", lifetime_years: 5 }, omPct = 0.12, startMonth = 1) {
   const monthsPerYear = distributeMonths(kontrakBulan, startMonth);
 
@@ -86,7 +100,7 @@ export function calcPreview(products, kontrakBulan, capex = { material: "", jasa
       revByYear[yr] += rev;
 
       const otcCost = yr === 0 ? (product.otc || 0) * qty * 0.75 : 0;
-      const recurringCost = product.isHSI ? 0 : (product.bulanan || 0) * qty * m * 0.70;
+      const recurringCost = (product.bulanan || 0) * qty * m * getRecurringCostRatio(product);
       cogsByYear[yr] += otcCost + recurringCost;
     }
   });

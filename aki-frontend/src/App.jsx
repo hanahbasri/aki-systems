@@ -239,6 +239,7 @@ export default function AKIApp() {
       name: p.product.value, qty: p.qty,
       monthly_price: p.product.bulanan, otc_price: p.product.otc,
       is_hsi: p.product.isHSI, satuan: p.product.satuan, tipe: p.tipe,
+      evp: p.product.evp,
     })),
     capex: capex.material || capex.jasa ? {
       material: parseFloat(capex.material) || 0,

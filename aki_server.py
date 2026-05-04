@@ -100,6 +100,7 @@ def _parse_input(data: dict) -> AKIInput:
             monthly_price=float(p["monthly_price"]),
             otc_price=float(p.get("otc_price", 0)),
             is_hsi=bool(p.get("is_hsi", False)),
+            evp=float(p["evp"]) if p.get("evp") not in (None, "") else None,
             satuan=p.get("satuan", "Titik"),
             tipe=p.get("tipe", "Butuh JT"),
         ))

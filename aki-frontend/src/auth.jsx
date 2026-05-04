@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { BrandMark } from "./components/Layout.jsx";
 import { apiFetch, setToken, setUser } from "./authClient.js";
 import { supabase } from "./supabaseClient.js";
 
@@ -107,15 +108,11 @@ export function LoginPage({ onLogin, initialError = "", onErrorClear }) {
       >
         {/* Kiri: Branding */}
         <section className="hidden lg:block w-full">
-          <div className="mb-7 flex items-center gap-4">
-            <div>
-              <h1 className="font-display text-4xl tracking-tight text-white" style={{ fontWeight: 600 }}>
-                AKI System
-              </h1>
-              <p className="mt-1 text-xs uppercase tracking-[.28em] text-red-200/65" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>
-                Analisis Kelayakan Investasi · Telkom
-              </p>
-            </div>
+          <div className="mb-7">
+            <BrandMark />
+            <p className="mt-1 text-xs uppercase tracking-[.28em] text-red-200/65" style={{ fontFamily: "'DM Sans', sans-serif", fontWeight: 500 }}>
+              Analisis Kelayakan Investasi · Telkom
+            </p>
           </div>
 
           <h2 className="text-5xl lg:text-6xl leading-[1.1] tracking-tight text-white mt-10" style={{ fontFamily: "'Poppins', sans-serif", fontWeight: 600 }}>
@@ -130,9 +127,9 @@ export function LoginPage({ onLogin, initialError = "", onErrorClear }) {
         {/* Kanan: Auth card */}
         <section className="mx-auto w-full max-w-md lg:max-w-[420px] lg:translate-y-16">
           <div className="mb-7 text-center lg:hidden">
-            <h1 className="text-3xl text-white font-display" style={{ fontWeight: 600 }}>
-              AKI System
-            </h1>
+            <div className="flex justify-center">
+              <BrandMark compact />
+            </div>
             <p className="mt-1 text-xs uppercase tracking-[.28em] text-red-200/65" style={{ fontFamily: "'DM Sans', sans-serif" }}>
               Analisis Kelayakan Investasi · Telkom
             </p>

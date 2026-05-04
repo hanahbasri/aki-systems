@@ -1,4 +1,4 @@
-export const PRODUCTS = [
+const RAW_PRODUCTS = [
   // HSI Bisnis
   { value: "HSI Bisnis 50 Mbps", otc: 150000, bulanan: 439000, satuan: "Titik", isHSI: true, group: "HSI Bisnis" },
   { value: "HSI Bisnis 75 Mbps", otc: 150000, bulanan: 519000, satuan: "Titik", isHSI: true, group: "HSI Bisnis" },
@@ -1574,3 +1574,83 @@ export const PRODUCTS = [
   { value: "Astinet China Jabodetabek 900 Mbps", otc: 2500000, bulanan: 125192000, satuan: "Titik", isHSI: false, group: "Astinet China Jabodetabek" },
   { value: "Astinet China Jabodetabek 1000 Mbps", otc: 2500000, bulanan: 137741000, satuan: "Titik", isHSI: false, group: "Astinet China Jabodetabek" },
 ];
+
+const DEFAULT_NON_HSI_EVP = 0.30;
+
+const GROUP_EVP = {
+  "Komponen Astinet": 0.25,
+  "PSB Astinet": 0.25,
+  "Astinet Dedicated": 0.30,
+  "Astinet BB": 0.30,
+  "Astinet Fit IP/31": 0.30,
+  "Astinet Fit IP/29": 0.20,
+  "Astinet Lite": 0.30,
+  "Astinet Premium": 0.30,
+  "Astinet China Jabodetabek": 0.30,
+  "Astinet China": 0.30,
+  "Add On IPv4 Astinet": 0.50,
+  "Astinet Reguler JaBoDeTaBek": 0.30,
+  "Astinet Reguler Jawa": 0.30,
+  "Astinet Beda BW JaBoDeTaBek": 0.30,
+  "Astinet Fit": 0.30,
+  "IP Transit Reguler Jabodetabek Global": 0.20,
+  "IP Transit Beda BW Jabodetabek Domestik": 0.20,
+  "IP Transit Beda BW Jabodetabek Global": 0.20,
+  "IP Transit NeuCentrIX Reguler Jabodetabek": 0.20,
+  "IP Transit NeuCentrIX Beda BW Jabodetabek Global": 0.20,
+  "IP Transit NeuCentrIX Beda BW Jabodetabek Domestik": 0.20,
+  "Metro-E Inner,Intra Jabodetabek P2P/P2MP - Best Effort": 0.30,
+  "Metro-E Inner,Intra Jabodetabek P2P/P2MP - Interaktif": 0.30,
+  "Metro-E Inner,Intra Jabodetabek MP2MP - Best Effort": 0.30,
+  "Metro-E NeuCentIX Inter Pamal P2P/P2MP - Interaktif": 0.30,
+  "Metro-E NeuCentIX NNI Pamal P2P/P2MP - Best Effort": 0.30,
+  "Metro-E NeuCentIX NNI Pamal P2P/P2MP - Interaktif": 0.30,
+  "VPN IP": 0.30,
+  "Metro E": 0.30,
+  "WMS": 0.30,
+  "Astinet China Jabodetabek": 0.30,
+};
+
+const PARENT_EVP = [
+  ["PSB Astinet", 0.25],
+  ["Astinet Fit IP/29", 0.20],
+  ["Astinet Fit IP/31", 0.30],
+  ["Add On IPv4 Astinet", 0.50],
+  ["IP Transit", 0.20],
+  ["VPN IP", 0.30],
+  ["Metro E", 0.30],
+  ["WMS", 0.30],
+  ["Astinet", 0.30],
+];
+
+const normalizeEvp = (evp) => {
+  if (evp == null || Number.isNaN(Number(evp))) return null;
+  const value = Number(evp);
+  if (value < 0) return null;
+  return value > 1 ? value / 100 : value;
+};
+
+const resolveParentEvp = (product) => {
+  const name = product?.value || "";
+  const group = product?.group || "";
+  for (const [prefix, evp] of PARENT_EVP) {
+    if (name.startsWith(prefix) || group.startsWith(prefix) || name.includes(prefix) || group.includes(prefix)) {
+      return evp;
+    }
+  }
+  return null;
+};
+
+export const PRODUCTS = RAW_PRODUCTS.map((product) => {
+  const explicitEvp = normalizeEvp(product.evp);
+  const parentEvp = normalizeEvp(resolveParentEvp(product));
+  const groupEvp = normalizeEvp(GROUP_EVP[product.group]);
+  const evp = product.isHSI
+    ? null
+    : (explicitEvp ?? parentEvp ?? groupEvp ?? DEFAULT_NON_HSI_EVP);
+
+  return {
+    ...product,
+    evp,
+  };
+});

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AppBackground, LogoStrip } from "../components/Layout.jsx";
+import { AppBackground, BrandMark, LogoStrip } from "../components/Layout.jsx";
 import { PRODUCTS } from "../data/products.js";
 import { fmt, fmtPct } from "../utils/calc.js";
 
@@ -64,6 +64,11 @@ function ProductSearch({ row, index, onChange, onRemove }) {
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${row.product.isHSI ? "bg-orange-500/20 text-orange-300" : "bg-red-500/20 text-red-300"}`}>
                 {row.product.isHSI ? "HSI" : "Non-HSI"}
               </span>
+              {!row.product.isHSI && (
+                <span className="text-xs text-white/40">
+                  EVP {row.product.evp != null ? `${(row.product.evp * 100).toFixed(0)}%` : "-"}
+                </span>
+              )}
               <span className="text-xs text-white/40">Rp {fmt(row.product.bulanan)}/bln</span>
             </>
           ) : <span className="text-xs text-white/20 italic">—</span>}
@@ -157,7 +162,7 @@ export default function HalamanInput({
         <div className="flex w-full items-center px-4 py-4 md:px-6">
           {page !== "dashboard" && (
             <div className="shrink-0 min-w-[120px]">
-              <div className="syne truncate text-lg font-800 leading-none tracking-tight text-white md:text-xl">AKI System</div>
+              <BrandMark compact />
               <div className="mt-1 truncate text-xs text-red-200/60">Solution & Offering · {user.profile?.full_name || user.email}</div>
             </div>
           )}
@@ -235,7 +240,7 @@ export default function HalamanInput({
                 <select className="gi w-full px-4 py-3 rounded-xl text-sm"
                   value={form.lokasi} onChange={e => setForm({ ...form, lokasi: e.target.value })}>
                   <option value="">-- Pilih Lokasi --</option>
-                  {["Cianjur", "Cibadak", "Cibinong", "Depok", "Kujang", "Sentul", "Sukabumi"].map(o => <option key={o}>{o}</option>)}
+                  {["Kota Bogor", "Kab Bogor", "Depok", "Kota Sukabumi", "Kab Sukabumi", "Cianjur"].map(o => <option key={o}>{o}</option>)}
                 </select>
               </div>
               <div>
@@ -282,8 +287,9 @@ export default function HalamanInput({
             <div className="glass-sm rounded-xl px-4 py-3 text-xs text-amber-300/70"
               style={{ borderColor: "rgba(245,158,11,0.2)" }}>
               <strong className="text-amber-300">Catatan Biaya: </strong>
-              HSI → seluruh harga (100%) merupakan biaya (tanpa keuntungan) |
-              Non-HSI → 70% dari harga digunakan sebagai biaya produk
+              HSI → recurring cost = 0 |
+              Non-HSI → recurring cost = harga bulanan × (1 - EVP) |
+              kalau EVP belum ada, fallback 70%
             </div>
           </div>
         )}
@@ -387,6 +393,11 @@ export default function HalamanInput({
                               <span className={`text-xs px-2 py-0.5 rounded-full ${p.product.isHSI ? "bg-orange-500/15 text-orange-300/70" : "bg-white/5 text-white/35"}`}>
                                 {p.product.isHSI ? "HSI" : "Non-HSI"}
                               </span>
+                              {!p.product.isHSI && (
+                                <span className="text-xs text-white/30">
+                                  EVP {p.product.evp != null ? `${(p.product.evp * 100).toFixed(0)}%` : "-"}
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-3 mt-0.5 text-xs text-white/35">
                               <span>×{p.qty} {p.product.satuan}</span>

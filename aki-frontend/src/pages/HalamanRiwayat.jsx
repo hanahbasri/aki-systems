@@ -1,5 +1,6 @@
 import { AppBackground, LogoStrip } from "../components/Layout.jsx";
 import { fmt, fmtPct } from "../utils/calc.js";
+import { BrandMark } from "../components/Layout.jsx";
 
 export default function HalamanRiwayat({ user, history, page, setPage, setShowExitModal, handleUseHistory, clearHistory, exitModalUI }) {
   return (
@@ -7,8 +8,7 @@ export default function HalamanRiwayat({ user, history, page, setPage, setShowEx
       <header className="sticky top-0 z-30 border-b border-white/10 bg-black/55 backdrop-blur-2xl relative">
         <div className="flex w-full items-center gap-4 px-4 py-4 md:px-6">
           <div className="min-w-0 flex-1">
-            <div className="syne truncate text-xl font-800 leading-none tracking-tight text-white md:text-2xl">AKI System</div>
-            <div className="mt-1 truncate text-xs text-red-200/60">Solution & Offering · {user?.profile?.full_name || user?.email}</div>
+            <BrandMark />
           </div>
 
           <button
