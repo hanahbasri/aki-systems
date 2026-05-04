@@ -142,13 +142,9 @@ export default function HalamanInput({
   handleCalculate, handleGetRecos, handleExportPdf, updateProduct,
   exitModalUI, apiAvailable, calcWarning,
   cameFromHistory, setCameFromHistory,
+  handleBackToFirstStep, handleFinishToHome,
 }) {
   const handleBack = () => {
-    if (isLastStep) {
-      setCameFromHistory?.(false);
-      setPage("home");
-      return;
-    }
     if (step === 0) {
       setPage("home");
       return;
@@ -530,7 +526,7 @@ export default function HalamanInput({
 
                 {/* Aksi */}
                 <div className="flex gap-3 flex-wrap">
-                  <button onClick={handleCalculate} disabled={loading}
+                  <button onClick={handleBackToFirstStep} disabled={loading}
                     className="px-4 py-2.5 glass rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2">
                     🔄 Hitung Ulang
                   </button>
@@ -597,7 +593,12 @@ export default function HalamanInput({
             className="px-5 py-2.5 glass rounded-xl text-sm font-medium text-white/50 hover:text-white hover:bg-white/10 transition-all">
             ← Kembali
           </button>
-          {!isLastStep && (
+          {isLastStep ? (
+            <button onClick={handleFinishToHome}
+              className="px-7 py-2.5 bg-red-700 text-white rounded-xl text-sm font-semibold hover:bg-red-600 transition-all shadow-lg shadow-red-900/30">
+              Selesai
+            </button>
+          ) : (
             <button onClick={() => setStep(s => s + 1)}
               disabled={step === 0 && (!form.nama_program || !form.nama_customer || !form.lokasi || kontrakBulan === 0)}
               className="px-7 py-2.5 bg-red-700 text-white rounded-xl text-sm font-semibold hover:bg-red-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-900/30">

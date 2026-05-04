@@ -406,6 +406,20 @@ export default function AKIApp() {
     setPage("dashboard");
   };
 
+  const handleBackToFirstStep = () => {
+    setResult(null);
+    setRecos(null);
+    setCalcWarning("");
+    setStep(0);
+    setCameFromHistory(false);
+    setPage("dashboard");
+  };
+
+  const handleFinishToHome = () => {
+    setCameFromHistory(false);
+    setPage("home");
+  };
+
   if (page === "home") return (
     <HalamanBeranda
       user={user}
@@ -455,6 +469,8 @@ export default function AKIApp() {
       calcWarning={calcWarning}
       cameFromHistory={cameFromHistory}
       setCameFromHistory={setCameFromHistory}
+      handleBackToFirstStep={handleBackToFirstStep}
+      handleFinishToHome={handleFinishToHome}
     />
   );
 }
