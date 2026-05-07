@@ -27,12 +27,9 @@ SUPABASE_KEY = (
     or os.getenv("SUPABASE_ANON_KEY")
 )
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError(
-        "Supabase env missing. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (recommended) in .env."
-    )
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Client | None = None
+if SUPABASE_URL and SUPABASE_KEY:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 OUTPUT_DIR = Path(tempfile.gettempdir()) / "aki_outputs"
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -41,6 +38,8 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 # ── Auth middleware ───────────────────────────────────────────────────────────
 def get_current_user(req):
     """Verify JWT from Authorization header, return user + profile."""
+    if not supabase:
+        return None, None
     auth = req.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         return None, None
@@ -225,6 +224,8 @@ def _save_submission(data: dict, result: dict, user_id: str, products: list) -> 
 def register():
     """Register new user."""
     data = request.get_json()
+    if not supabase:
+        return jsonify({"ok": False, "error": "Auth service belum dikonfigurasi"}), 503
     try:
         res = supabase.auth.sign_up({
             "email": data["email"],
@@ -245,6 +246,8 @@ def register():
 def login():
     """Login and return JWT tokens."""
     data = request.get_json()
+    if not supabase:
+        return jsonify({"ok": False, "error": "Auth service belum dikonfigurasi"}), 503
     try:
         res = supabase.auth.sign_in_with_password({
             "email": data["email"],
@@ -274,7 +277,6 @@ def me():
 # ── AKI Routes ────────────────────────────────────────────────────────────────
 
 @app.route("/api/calculate", methods=["POST"])
-@require_auth()
 def calculate():
     """Calculate AKI. Optionally save to DB."""
     try:
@@ -293,7 +295,6 @@ def calculate():
 
 
 @app.route("/api/recommend", methods=["POST"])
-@require_auth()
 def recommend():
     """Get AI recommendations for not-layak project."""
     try:
@@ -319,7 +320,6 @@ def recommend():
 
 
 @app.route("/api/export-pdf", methods=["POST"])
-@require_auth()
 def export_pdf():
     """Generate PDF ringkasan AKI."""
     try:

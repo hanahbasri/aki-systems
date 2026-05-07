@@ -1608,7 +1608,6 @@ const GROUP_EVP = {
   "VPN IP": 0.30,
   "Metro E": 0.30,
   "WMS": 0.30,
-  "Astinet China Jabodetabek": 0.30,
 };
 
 const PARENT_EVP = [

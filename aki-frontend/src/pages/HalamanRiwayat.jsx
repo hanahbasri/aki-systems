@@ -2,7 +2,7 @@ import { AppBackground, LogoStrip } from "../components/Layout.jsx";
 import { fmt, fmtPct } from "../utils/calc.js";
 import { BrandMark } from "../components/Layout.jsx";
 
-export default function HalamanRiwayat({ user, history, page, setPage, setShowExitModal, handleUseHistory, clearHistory, exitModalUI }) {
+export default function HalamanRiwayat({ history, page, setPage, handleUseHistory, clearHistory, exitModalUI }) {
   return (
     <AppBackground>
       <header className="sticky top-0 z-30 border-b border-white/10 bg-black/55 backdrop-blur-2xl relative">
@@ -23,13 +23,6 @@ export default function HalamanRiwayat({ user, history, page, setPage, setShowEx
             className={`hidden rounded-full border px-4 py-2 text-sm font-semibold transition md:inline-flex ${page === "history" ? "border-red-600 bg-red-600 text-white shadow-lg" : "border-white/10 bg-white/5 text-white/65 hover:bg-white/10 hover:text-white"}`}
           >
             Riwayat ({history.length})
-          </button>
-
-          <button
-            onClick={() => setShowExitModal(true)}
-            className="hidden rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 hover:text-red-300 md:inline-flex"
-          >
-            Keluar
           </button>
 
           <div className="ml-auto hidden shrink-0 md:block">

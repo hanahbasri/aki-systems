@@ -141,7 +141,6 @@ export default function HalamanInput({
   hasProducts, steps, step, setStep, isLastStep, kontrakBulan,
   handleCalculate, handleGetRecos, handleExportPdf, updateProduct,
   exitModalUI, apiAvailable, calcWarning,
-  cameFromHistory, setCameFromHistory,
   handleBackToFirstStep, handleFinishToHome,
 }) {
   const handleBack = () => {
@@ -195,7 +194,7 @@ export default function HalamanInput({
                 </button>
               )}
               <button onClick={() => setShowExitModal(true)} className="hidden rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-400 transition hover:bg-red-500/20 hover:text-red-300 md:inline-flex">
-                Keluar
+                Reset
               </button>
               <div className="hidden md:block"><LogoStrip /></div>
             </div>
