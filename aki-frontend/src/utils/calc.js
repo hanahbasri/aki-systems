@@ -116,9 +116,14 @@ const getOtcCostFixed = (product) => normalizeMoney(
 );
 
 const getRecurringCost = (product, qty, activeMonths) => {
+  const fixed = getRecurringCostFixed(product);
+  if (product?.isHSI && normalizeMoney(product?.tarif) > 0) {
+    const tarif = normalizeMoney(product.tarif);
+    const ont = normalizeMoney(product.ont);
+    return (tarif * 0.75 + ont + fixed) * qty * activeMonths;
+  }
   const monthlyPrice = normalizeMoney(product?.bulanan);
   const ratio = getRecurringCostRatio(product);
-  const fixed = getRecurringCostFixed(product);
   return ((monthlyPrice * ratio) + fixed) * qty * activeMonths;
 };
 
