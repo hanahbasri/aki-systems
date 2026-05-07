@@ -155,11 +155,10 @@ def generate_pdf(result: dict, aki_input) -> bytes:
     prod_header = [
         Paragraph("Nama Produk", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold")),
         Paragraph("Qty", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_CENTER)),
-        Paragraph("Satuan", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_CENTER)),
+        Paragraph("Info", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_CENTER)),
         Paragraph("Tipe", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_CENTER)),
-        Paragraph("HSI", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_CENTER)),
-        Paragraph("Harga/bln per unit", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_RIGHT)),
-        Paragraph("Total/bln", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_RIGHT)),
+        Paragraph("Harga per unit", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_RIGHT)),
+        Paragraph("Total", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_RIGHT)),
         Paragraph("OTC", ParagraphStyle("ph", parent=S["label"], textColor=WHITE, fontName="Helvetica-Bold", alignment=TA_RIGHT)),
     ]
     prod_rows = [prod_header]
@@ -170,27 +169,27 @@ def generate_pdf(result: dict, aki_input) -> bytes:
         otc_total = prod.otc_price * prod.qty
         total_monthly += subtotal
         total_otc += otc_total
+        info_label = prod.charge_type if prod.charge_type else ("HSI" if prod.is_hsi else "MRC")
         prod_rows.append([
             Paragraph(prod.name, S["body"]),
             Paragraph(str(prod.qty), ParagraphStyle("c", parent=S["body"], alignment=TA_CENTER)),
-            Paragraph(prod.satuan, ParagraphStyle("c", parent=S["body"], alignment=TA_CENTER)),
+            Paragraph(info_label, ParagraphStyle("c", parent=S["body"], alignment=TA_CENTER)),
             Paragraph(prod.tipe, ParagraphStyle("c", parent=S["body"], alignment=TA_CENTER)),
-            Paragraph("HSI" if prod.is_hsi else "Non-HSI", ParagraphStyle("c", parent=S["body"], alignment=TA_CENTER)),
-            Paragraph(f"Rp {fmt(prod.monthly_price)}", S["mono"]),
-            Paragraph(f"Rp {fmt(subtotal)}", S["mono"]),
+            Paragraph(f"Rp {fmt(prod.monthly_price)}" if prod.monthly_price else "—", S["mono"]),
+            Paragraph(f"Rp {fmt(subtotal)}" if subtotal else "—", S["mono"]),
             Paragraph(f"Rp {fmt(otc_total)}" if otc_total else "—", S["mono"]),
         ])
     # Total row
     prod_rows.append([
-        Paragraph("Total Recurring", ParagraphStyle("tb", parent=S["body"], fontName="Helvetica-Bold")),
-        "", "", "", "",
+        Paragraph("Total", ParagraphStyle("tb", parent=S["body"], fontName="Helvetica-Bold")),
+        "", "", "",
         "",
         Paragraph(f"Rp {fmt(total_monthly)}", ParagraphStyle("tbr", parent=S["mono"], fontName="Courier-Bold")),
         Paragraph(f"Rp {fmt(total_otc)}" if total_otc else "—", ParagraphStyle("tbr", parent=S["mono"], fontName="Courier-Bold")),
     ])
 
-    cw_prod = [W - 2*MARGIN - 18*mm - 22*mm - 12*mm - 12*mm - 9*mm - 22*mm - 22*mm,
-               9*mm, 14*mm, 18*mm, 14*mm, 22*mm, 22*mm, 22*mm]
+    cw_prod = [W - 2*MARGIN - 14*mm - 22*mm - 9*mm - 28*mm - 28*mm - 22*mm,
+               9*mm, 14*mm, 18*mm, 28*mm, 28*mm, 22*mm]
     prod_tbl = Table(prod_rows, colWidths=cw_prod, repeatRows=1)
     prod_style = TableStyle([
         ("BACKGROUND",   (0,0), (-1,0), DARK),

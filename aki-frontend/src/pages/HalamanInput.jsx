@@ -22,7 +22,7 @@ function getProductPriceLines(product, qty = 1) {
   }
 
   // MRC default
-  if ((product.bulanan || 0) > 0) lines.push(`Rp ${fmt(product.bulanan * qty)}/bln`);
+  if ((product.bulanan || 0) > 0) lines.push(`Rp ${fmt(product.bulanan * qty)}`);
   return lines;
 }
 
