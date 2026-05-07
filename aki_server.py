@@ -98,9 +98,13 @@ def _parse_input(data: dict) -> AKIInput:
             name=p["name"], qty=int(p.get("qty", 1)),
             monthly_price=float(p["monthly_price"]),
             otc_price=float(p.get("otc_price", 0)),
+            charge_type=p.get("charge_type") or p.get("info", ""),
             is_hsi=bool(p.get("is_hsi", False)),
             evp=float(p["evp"]) if p.get("evp") not in (None, "") else None,
-            satuan=p.get("satuan", "Titik"),
+            cogs_bulanan_pct=float(p["cogs_bulanan_pct"]) if p.get("cogs_bulanan_pct") not in (None, "") else None,
+            cogs_bulanan_nominal=float(p.get("cogs_bulanan_nominal", 0) or 0),
+            cogs_otc_pct=float(p["cogs_otc_pct"]) if p.get("cogs_otc_pct") not in (None, "") else None,
+            cogs_otc_nominal=float(p.get("cogs_otc_nominal", 0) or 0),
             tipe=p.get("tipe", "Butuh JT"),
         ))
     capex_data = data.get("capex")
@@ -198,7 +202,6 @@ def _save_submission(data: dict, result: dict, user_id: str, products: list) -> 
             "monthly_price": p.get("monthly_price", 0),
             "otc_price": p.get("otc_price", 0),
             "is_hsi": p.get("is_hsi", False),
-            "satuan": p.get("satuan", "Titik"),
             "tipe": p.get("tipe", "Butuh JT"),
             "sort_order": i,
         }

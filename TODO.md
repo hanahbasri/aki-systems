@@ -1,0 +1,6 @@
+- [ ] Update UI “Produk & Layanan” to remove OTC split line; show only one “Harga” per product based on charge type:
+  - MRC: show `Rp <bulanan*qty>/bln`
+  - OTC: show `Rp <otc*qty>`
+- [ ] Update “Ringkasan Proyek” total harga section to remove “+ OTC” breakdown; total should be aggregated as:
+  - MRC uses bulanan, OTC uses otc
+- [ ] Run quick sanity check by searching for remaining UI strings/sections that show OTC separately or non-hsi/evp labels.

@@ -77,11 +77,56 @@ const normalizeEvp = (evp) => {
   return value > 1 ? value / 100 : value;
 };
 
+const normalizePct = (value) => {
+  if (value == null || value === "" || Number.isNaN(Number(value))) return null;
+  const normalized = Number(value);
+  if (normalized < 0) return null;
+  return normalized > 1 ? normalized / 100 : normalized;
+};
+
+const normalizeMoney = (value) => {
+  if (value == null || value === "" || Number.isNaN(Number(value))) return 0;
+  return Math.max(0, Number(value));
+};
+
 const getRecurringCostRatio = (product) => {
-  if (!product || product.isHSI) return 0;
+  if (!product) return 0;
+  const explicit = normalizePct(product.cogsBulananPct ?? product.monthlyCogsPct);
+  if (explicit != null) return explicit;
+  if (product.isHSI) return 0.75;
   const evp = normalizeEvp(product.evp);
   if (evp != null) return Math.max(0, 1 - evp);
   return 0.70;
+};
+
+const getRecurringCostFixed = (product) => normalizeMoney(
+  product?.cogsBulananNominal ?? product?.monthlyCogsNominal
+);
+
+const getOtcCostRatio = (product) => {
+  if (!product) return 0;
+  const explicit = normalizePct(product.cogsOtcPct ?? product.otcCogsPct);
+  if (explicit != null) return explicit;
+  if (normalizeMoney(product.otc) <= 0) return 0;
+  return product.isHSI ? 0.25 : 0.75;
+};
+
+const getOtcCostFixed = (product) => normalizeMoney(
+  product?.cogsOtcNominal ?? product?.otcCogsNominal
+);
+
+const getRecurringCost = (product, qty, activeMonths) => {
+  const monthlyPrice = normalizeMoney(product?.bulanan);
+  const ratio = getRecurringCostRatio(product);
+  const fixed = getRecurringCostFixed(product);
+  return ((monthlyPrice * ratio) + fixed) * qty * activeMonths;
+};
+
+const getOtcCost = (product, qty) => {
+  const otc = normalizeMoney(product?.otc);
+  const ratio = getOtcCostRatio(product);
+  const fixed = getOtcCostFixed(product);
+  return ((otc * ratio) + fixed) * qty;
 };
 
 export function calcPreview(products, kontrakBulan, capex = { material: "", jasa: "", lifetime_years: 5 }, omPct = 0.12, startMonth = 1) {
@@ -99,8 +144,8 @@ export function calcPreview(products, kontrakBulan, capex = { material: "", jasa
       const rev = otcRev + recurringRev;
       revByYear[yr] += rev;
 
-      const otcCost = yr === 0 ? (product.otc || 0) * qty * 0.75 : 0;
-      const recurringCost = (product.bulanan || 0) * qty * m * getRecurringCostRatio(product);
+      const otcCost = yr === 0 ? getOtcCost(product, qty) : 0;
+      const recurringCost = getRecurringCost(product, qty, m);
       cogsByYear[yr] += otcCost + recurringCost;
     }
   });

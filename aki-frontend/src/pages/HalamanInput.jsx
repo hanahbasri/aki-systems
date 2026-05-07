@@ -9,16 +9,34 @@ function Label({ children }) {
   return <div className="text-xs font-semibold text-white/40 uppercase tracking-widest mb-2">{children}</div>;
 }
 
+function getProductPriceLines(product, qty = 1) {
+  if (!product) return [];
+
+  const lines = [];
+  const info = product.info ?? product.chargeType ?? "";
+
+  // Catatan biaya di UI dihapus: tampilkan hanya 1 baris "Harga"
+  if (info === "OTC") {
+    if ((product.otc || 0) > 0) lines.push(`Rp ${fmt(product.otc * qty)}`);
+    return lines;
+  }
+
+  // MRC default
+  if ((product.bulanan || 0) > 0) lines.push(`Rp ${fmt(product.bulanan * qty)}/bln`);
+  return lines;
+}
+
 function ProductSearch({ row, index, onChange, onRemove }) {
   const [q, setQ] = useState(row.product?.value || "");
   const [open, setOpen] = useState(false);
   const filtered = q.length > 1 ? PRODUCTS.filter(p => p.value.toLowerCase().includes(q.toLowerCase())) : [];
   const groups = [...new Set(filtered.map(p => p.group))];
+  const priceLines = getProductPriceLines(row.product);
 
   return (
     <div className="glass-sm rounded-xl p-3 hover:border-red-500/20 transition-colors">
       <div className="grid grid-cols-1 gap-2 items-center md:grid-cols-12">
-        <div className="relative md:col-span-5">
+        <div className="relative md:col-span-4">
           <svg className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/30" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
           </svg>
@@ -38,7 +56,7 @@ function ProductSearch({ row, index, onChange, onRemove }) {
                     <button key={p.value} className="w-full text-left px-4 py-2.5 text-sm text-white/80 hover:bg-red-900/30 hover:text-white flex justify-between transition-colors"
                       onMouseDown={() => { onChange(index, "product", p); setQ(p.value); setOpen(false); }}>
                       <span>{p.value}</span>
-                      <span className="text-xs text-white/30 ml-2 shrink-0">{p.satuan}</span>
+                      <span className="text-xs text-white/30 ml-2 shrink-0">{p.info}</span>
                     </button>
                   ))}
                 </div>
@@ -61,16 +79,17 @@ function ProductSearch({ row, index, onChange, onRemove }) {
         <div className="flex flex-col items-center justify-center gap-1 md:col-span-2">
           {row.product ? (
             <>
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${row.product.isHSI ? "bg-orange-500/20 text-orange-300" : "bg-red-500/20 text-red-300"}`}>
-                {row.product.isHSI ? "HSI" : "Non-HSI"}
-              </span>
-              {!row.product.isHSI && (
-                <span className="text-xs text-white/40">
-                  EVP {row.product.evp != null ? `${(row.product.evp * 100).toFixed(0)}%` : "-"}
-                </span>
-              )}
-              <span className="text-xs text-white/40">Rp {fmt(row.product.bulanan)}/bln</span>
+              {priceLines.map((line) => (
+                <span key={line} className="text-xs text-center text-white/55">{line}</span>
+              ))}
             </>
+          ) : <span className="text-xs text-white/20 italic">—</span>}
+        </div>
+        <div className="flex items-center justify-center md:col-span-1">
+          {row.product ? (
+            <span className="rounded-full bg-white/5 px-2 py-1 text-[11px] font-semibold text-white/55">
+              {row.product.info}
+            </span>
           ) : <span className="text-xs text-white/20 italic">—</span>}
         </div>
         <div className="flex justify-end md:col-span-1">
@@ -261,10 +280,11 @@ export default function HalamanInput({
               <h2 className="syne text-xl font-700 text-white mb-1">Produk & Layanan</h2>
               <p className="text-white/35 text-sm mb-5">Tambah semua produk dalam proyek ini</p>
               <div className="hidden grid-cols-12 gap-2 mb-2 md:grid" style={{ paddingLeft: "13px", paddingRight: "13px" }}>
-                <div className="col-span-5 text-xs font-semibold text-white/25 uppercase tracking-wider text-center">Produk</div>
+                <div className="col-span-4 text-xs font-semibold text-white/25 uppercase tracking-wider text-center">Produk</div>
                 <div className="col-span-2 text-xs font-semibold text-white/25 uppercase tracking-wider text-center">Qty</div>
                 <div className="col-span-2 text-xs font-semibold text-white/25 uppercase tracking-wider text-center">Tipe</div>
-                <div className="col-span-2 text-xs font-semibold text-white/25 uppercase tracking-wider text-center">Info</div>
+                <div className="col-span-2 text-xs font-semibold text-white/25 uppercase tracking-wider text-center">Harga</div>
+                <div className="col-span-1 text-xs font-semibold text-white/25 uppercase tracking-wider text-center">Info</div>
                 <div className="col-span-1"></div>
               </div>
               <div className="space-y-2">
@@ -278,13 +298,6 @@ export default function HalamanInput({
                 style={{ border: "2px dashed rgba(255,255,255,0.1)" }}>
                 + Tambah Produk
               </button>
-            </div>
-            <div className="glass-sm rounded-xl px-4 py-3 text-xs text-amber-300/70"
-              style={{ borderColor: "rgba(245,158,11,0.2)" }}>
-              <strong className="text-amber-300">Catatan Biaya: </strong>
-              HSI → recurring cost = 0 |
-              Non-HSI → recurring cost = harga bulanan × (1 - EVP) |
-              kalau EVP belum ada, fallback 70%
             </div>
           </div>
         )}
@@ -385,45 +398,43 @@ export default function HalamanInput({
                           <div className="flex-1 min-w-0 pr-3">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-white/80">{p.product.value}</span>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${p.product.isHSI ? "bg-orange-500/15 text-orange-300/70" : "bg-white/5 text-white/35"}`}>
-                                {p.product.isHSI ? "HSI" : "Non-HSI"}
+                              <span className="rounded-full bg-white/5 px-2 py-0.5 text-xs font-semibold text-white/45">
+                                {p.product.info}
                               </span>
-                              {!p.product.isHSI && (
-                                <span className="text-xs text-white/30">
-                                  EVP {p.product.evp != null ? `${(p.product.evp * 100).toFixed(0)}%` : "-"}
-                                </span>
-                              )}
                             </div>
                             <div className="flex items-center gap-3 mt-0.5 text-xs text-white/35">
-                              <span>×{p.qty} {p.product.satuan}</span>
+                              <span>×{p.qty}</span>
                               <span className={p.tipe === "Butuh JT" ? "text-red-300/60" : ""}>{p.tipe}</span>
-                              {p.product.otc > 0 && (
-                                <span>OTC: Rp {fmt(p.product.otc * p.qty)}</span>
-                              )}
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-mono text-white/75">
-                              Rp {fmt(p.product.bulanan * p.qty)}<span className="text-white/30 text-xs">/bln</span>
-                            </div>
-                            {p.qty > 1 && (
-                              <div className="text-white/30 text-xs mt-0.5">@ Rp {fmt(p.product.bulanan)}/unit</div>
-                            )}
+                          <div className="text-right shrink-0 space-y-0.5">
+                            {getProductPriceLines(p.product, p.qty).map((line) => (
+                              <div key={line} className="font-mono text-white/75">{line}</div>
+                            ))}
                           </div>
                         </div>
                       ))}
                       {/* Total baris */}
                       {(() => {
-                        const totalBulanan = products.filter(p => p.product).reduce((s, p) => s + p.product.bulanan * p.qty, 0);
-                        const totalOTC = products.filter(p => p.product).reduce((s, p) => s + p.product.otc * p.qty, 0);
+                        // Total Harga di UI diaggregasi sesuai charge type (MRC vs OTC)
+                        const total = products
+                          .filter(p => p.product)
+                          .reduce((s, p) => {
+                            const info = p.product.info ?? p.product.chargeType ?? "";
+                            if (info === "OTC") return s + (p.product.otc || 0) * p.qty;
+                            return s + (p.product.bulanan || 0) * p.qty;
+                          }, 0);
+
+                        const hasOtc = products.some(p => p.product && (p.product.info ?? p.product.chargeType) === "OTC");
+
                         return (
                           <div className="flex items-center justify-between px-3 py-2.5 bg-white/[0.03] border-t border-white/10">
-                            <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Total Recurring</span>
+                            <span className="text-xs font-semibold text-white/40 uppercase tracking-wider">Total Harga</span>
                             <div className="text-right">
-                              <span className="font-mono font-semibold text-white/80">Rp {fmt(totalBulanan)}<span className="text-white/30 text-xs font-normal">/bln</span></span>
-                              {totalOTC > 0 && (
-                                <div className="text-xs text-white/35 mt-0.5">+ OTC Rp {fmt(totalOTC)}</div>
-                              )}
+                              <span className="font-mono font-semibold text-white/80">
+                                Rp {fmt(total)}
+                                {!hasOtc && <span className="text-white/30 text-xs font-normal">/bln</span>}
+                              </span>
                             </div>
                           </div>
                         );

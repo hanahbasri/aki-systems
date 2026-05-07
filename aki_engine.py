@@ -22,6 +22,8 @@ TAX_RATE = 0.22        # Per template (22%)
 BOP_LAKWAS_PCT = 0.004 # 0.4% of CAPEX
 OM_DEFAULT_PCT = 0.12  # 12% of revenue per month (annual: varies by active months)
 COGS_PCT_NON_HSI = 0.70  # 70% COGS for non-HSI products
+COGS_PCT_HSI = 0.75      # default recurring COGS for HSI products
+COGS_PCT_HSI_OTC = 0.25  # default OTC COGS for HSI products
 MIN_NPV = 0            # NPV > 0
 MIN_IRR = WACC + 0.02  # 13.35%
 MIN_NIM = 0.02         # 2%
@@ -52,7 +54,11 @@ class ProductLine:
     otc_price: float       # One-time charge (OTC instalasi)
     is_hsi: bool           # True = HSI, no COGS
     evp: Optional[float] = None  # EVP margin; recurring COGS = 1 - EVP
-    satuan: str = "Titik"
+    charge_type: str = ""
+    cogs_bulanan_pct: Optional[float] = None
+    cogs_bulanan_nominal: float = 0.0
+    cogs_otc_pct: Optional[float] = None
+    cogs_otc_nominal: float = 0.0
     tipe: str = "Butuh JT" # "Butuh JT" | "Tanpa JT"
 
 
@@ -153,14 +159,40 @@ def _resolve_parent_evp(name: str = "", group: str = "") -> Optional[float]:
 
 
 def _recurring_cogs_ratio(prod: ProductLine) -> float:
+    explicit = _normalize_evp(prod.cogs_bulanan_pct)
+    if explicit is not None:
+        return explicit
     if prod.is_hsi:
-        return 0.0
+        return COGS_PCT_HSI
     evp = _normalize_evp(prod.evp)
     if evp is None:
         evp = _resolve_parent_evp(prod.name)
     if evp is not None:
         return max(0.0, 1.0 - evp)
     return COGS_PCT_NON_HSI
+
+
+def _recurring_cogs_fixed(prod: ProductLine) -> float:
+    try:
+        return max(0.0, float(prod.cogs_bulanan_nominal or 0.0))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _otc_cogs_ratio(prod: ProductLine) -> float:
+    explicit = _normalize_evp(prod.cogs_otc_pct)
+    if explicit is not None:
+        return explicit
+    if prod.otc_price <= 0:
+        return 0.0
+    return COGS_PCT_HSI_OTC if prod.is_hsi else 0.75
+
+
+def _otc_cogs_fixed(prod: ProductLine) -> float:
+    try:
+        return max(0.0, float(prod.cogs_otc_nominal or 0.0))
+    except (TypeError, ValueError):
+        return 0.0
 
 
 # ── Core calculation ────────────────────────────────────────────────────────────
@@ -206,8 +238,9 @@ def calculate_aki(inp: AKIInput) -> dict:
     # ── 3. Direct Cost / COGS (Sheet 4. Dir) ──────────────────────────────────
     # OTC instalasi COGS = 75% of OTC revenue (from template: 1875000/2500000)
     # Recurring COGS:
-    #   HSI     -> 0
-    #   Non-HSI -> based on EVP (fallback 70% if EVP unavailable)
+    #   - explicit cogs_* fields from product data if present
+    #   - HSI fallback uses default monthly/OTC ratios
+    #   - Non-HSI fallback uses EVP or default 70%
     dir_by_year = [0.0] * N_YEARS
     dir_lines = []
 
@@ -215,8 +248,8 @@ def calculate_aki(inp: AKIInput) -> dict:
         line_dir = []
         for yr in range(N_YEARS):
             m = months_per_year[yr]
-            otc_cost = (prod.otc_price * 0.75 * prod.qty) if yr == 0 else 0.0
-            recurring_cost = prod.monthly_price * prod.qty * m * _recurring_cogs_ratio(prod)
+            otc_cost = ((prod.otc_price * _otc_cogs_ratio(prod)) + _otc_cogs_fixed(prod)) * prod.qty if yr == 0 else 0.0
+            recurring_cost = ((prod.monthly_price * _recurring_cogs_ratio(prod)) + _recurring_cogs_fixed(prod)) * prod.qty * m
             total_cost = otc_cost + recurring_cost
             line_dir.append(total_cost)
             dir_by_year[yr] += total_cost
@@ -517,7 +550,7 @@ def build_reco_context(result: dict) -> str:
         contrib_pct = (contrib_monthly / monthly_rev_total * 100) if monthly_rev_total > 0 else 0
         products_lines.append(
             f"  - [{('HSI' if p.is_hsi else 'Non-HSI')}] {p.name}: "
-            f"{p.qty} {p.satuan} × Rp{p.monthly_price:,.0f}/bln = Rp{contrib_monthly:,.0f}/bln ({contrib_pct:.1f}% revenue), "
+            f"{p.qty} × Rp{p.monthly_price:,.0f}/bln = Rp{contrib_monthly:,.0f}/bln ({contrib_pct:.1f}% revenue), "
             f"OTC Rp{p.otc_price:,.0f}"
         )
     products_summary = "\n".join(products_lines)
