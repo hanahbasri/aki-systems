@@ -121,7 +121,7 @@ function MetricCard({ label, value, ok, threshold }) {
 
 
 function RecoCard({ reco }) {
-  const icons = { upgrade_bandwidth: "📶", extend_contract: "📅", adjust_margin: "💰", add_product: "➕", reduce_capex: "🔧" };
+  const icons = { upgrade_bandwidth: "📶", extend_contract: "📅", adjust_margin: "💰", add_product: "➕", reduce_capex: "🔧", add_on: "🔌" };
   const border = { high: "border-red-500/30", medium: "border-orange-500/30", low: "border-white/10" };
   const badge = { high: "bg-red-500/20 text-red-300", medium: "bg-orange-500/20 text-orange-300", low: "bg-white/10 text-white/50" };
   const label = { high: "Prioritas Tinggi", medium: "Prioritas Sedang", low: "Prioritas Rendah" };
