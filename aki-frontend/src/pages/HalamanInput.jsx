@@ -341,7 +341,7 @@ export default function HalamanInput({
               <div>
                 <Label>O&M % / bulan</Label>
                 <div className="gi w-full px-4 py-3 rounded-xl text-sm text-white/50 cursor-default select-none">
-                  {(form.om_pct * 100).toFixed(0)}% dari Revenue
+                  {(form.om_pct * 100).toFixed(0)}% dari CAPEX
                 </div>
               </div>
             </div>
@@ -523,12 +523,12 @@ export default function HalamanInput({
 
                   {/* Key Metrics */}
                   <div className="grid gap-3 md:grid-cols-3">
-                    <MetricCard label="NPV (WACC 11.35%)" value={result.npv != null ? `Rp ${fmt(result.npv)}` : "—"} ok={result.npv_ok} threshold="NPV > 0" />
+                    <MetricCard label="NPV (WACC 11.76%)" value={result.npv != null ? `Rp ${fmt(result.npv)}` : "—"} ok={result.npv_ok} threshold="NPV > 0" />
                     <MetricCard
                       label="MIRR"
                       value={result.mirr != null ? fmtPct(result.mirr) : "Belum balik modal / cashflow tidak valid"}
                       ok={result.mirr != null ? result.irr_ok : false}
-                      threshold="Min 13.35%"
+                      threshold="Min 13.76%"
                     />
                     <MetricCard label="Payback Period" value={result.payback_str} ok={result.pp_ok} threshold={`< ${form.kontrak_tahun} Tahun`} />
                   </div>

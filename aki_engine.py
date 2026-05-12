@@ -17,21 +17,25 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 # ── Constants ──────────────────────────────────────────────────────────────────
-WACC = 0.1135          # Confirmed from template
+# FIX 4: WACC diupdate ke 11.76% (per template 2026). Nilai ini perlu diupdate
+#         setiap kali ada perubahan dari tim keuangan Telkom.
+WACC = 0.1176          # Updated: 11.76% per template 2026 (sebelumnya 11.35%)
 TAX_RATE = 0.22        # Per template (22%)
 BOP_LAKWAS_PCT = 0.004 # 0.4% of CAPEX
-OM_DEFAULT_PCT = 0.12  # 12% of revenue per month (annual: varies by active months)
-COGS_PCT_NON_HSI = 0.70  # 70% COGS for non-HSI products
-COGS_PCT_HSI = 0.75      # default recurring COGS for HSI products
-COGS_PCT_HSI_OTC = 0.25  # default OTC COGS for HSI products
+OM_DEFAULT_PCT = 0.12  # 12% of CAPEX per year
+COGS_PCT_NON_HSI = 0.70  # 70% COGS for non-HSI products (fallback)
+COGS_PCT_HSI = 0.75      # default recurring COGS for HSI products (fallback)
+COGS_PCT_HSI_OTC = 0.25  # default OTC COGS for HSI products (fallback)
 MIN_NPV = 0            # NPV > 0
-MIN_IRR = WACC + 0.02  # 13.35%
+MIN_IRR = WACC + 0.02  # 13.76% (WACC + 2%)
 MIN_NIM = 0.02         # 2%
 MIN_GPM = 0.07         # 7%
 N_YEARS = 5            # Projection horizon
 
+# FIX 5: Ganti 365 → 360 (Excel menggunakan 360-day year untuk konversi WC)
 AR_DAYS = 60           # Account Receivable days
 AP_DAYS = 60           # Account Payable days
+WC_DAYS_PER_YEAR = 360 # Excel pakai 360, bukan 365
 
 PARENT_EVP = [
     ("PSB Astinet", 0.25),
@@ -162,6 +166,10 @@ def _recurring_cogs_ratio(prod: ProductLine) -> float:
     explicit = _normalize_evp(prod.cogs_bulanan_pct)
     if explicit is not None:
         return explicit
+    # FIX 2: Jika nominal sudah tersedia (dari COGS Conn sheet), nominal adalah
+    # total COGS — jangan tambah ratio lagi (akan double-count).
+    if _recurring_cogs_fixed(prod) > 0:
+        return 0.0
     if prod.is_hsi:
         return COGS_PCT_HSI
     evp = _normalize_evp(prod.evp)
@@ -183,6 +191,9 @@ def _otc_cogs_ratio(prod: ProductLine) -> float:
     explicit = _normalize_evp(prod.cogs_otc_pct)
     if explicit is not None:
         return explicit
+    # FIX 2 (OTC): Sama — jika nominal OTC tersedia, ratio = 0 (hindari double-count)
+    if _otc_cogs_fixed(prod) > 0:
+        return 0.0
     if prod.otc_price <= 0:
         return 0.0
     return COGS_PCT_HSI_OTC if prod.is_hsi else 0.75
@@ -221,11 +232,12 @@ def calculate_aki(inp: AKIInput) -> dict:
     total_revenue = sum(rev_by_year)
 
     # ── 2. CAPEX & Depreciation (Sheet 3. Cpx) ────────────────────────────────
+    # FIX 3: Lifetime depresiasi = durasi kontrak (bukan user-input lifetime_years).
+    #         Excel selalu mengamortisasi CAPEX penuh dalam periode kontrak.
     if inp.capex:
         capex_total = inp.capex.total_investasi
-        lifetime = inp.capex.lifetime_years
-        # Monthly depreciation = capex_total / (lifetime * 12)
-        monthly_dep = capex_total / (lifetime * 12)
+        lifetime_bulan = max(inp.kontrak_total_bulan, 1)
+        monthly_dep = capex_total / lifetime_bulan
         dep_by_year = []
         for yr in range(N_YEARS):
             dep_by_year.append(monthly_dep * months_per_year[yr])
@@ -236,11 +248,12 @@ def calculate_aki(inp: AKIInput) -> dict:
         total_dep = 0.0
 
     # ── 3. Direct Cost / COGS (Sheet 4. Dir) ──────────────────────────────────
-    # OTC instalasi COGS = 75% of OTC revenue (from template: 1875000/2500000)
-    # Recurring COGS:
-    #   - explicit cogs_* fields from product data if present
-    #   - HSI fallback uses default monthly/OTC ratios
-    #   - Non-HSI fallback uses EVP or default 70%
+    # Prioritas COGS (dari Sheet COGS Conn):
+    #   1. cogs_*_nominal  → nominal langsung, tanpa ratio (sudah full COGS)
+    #   2. cogs_*_pct      → ratio eksplisit × price
+    #   3. fallback EVP / default ratio
+    # FIX 2 dihandle di _recurring_cogs_ratio() dan _otc_cogs_ratio():
+    #   jika nominal > 0 dan pct tidak di-set, ratio = 0 (tidak double-count).
     dir_by_year = [0.0] * N_YEARS
     dir_lines = []
 
@@ -258,12 +271,17 @@ def calculate_aki(inp: AKIInput) -> dict:
     total_cogs = sum(dir_by_year)
 
     # ── 4. OPEX / O&M (Sheet 5. Opx) ──────────────────────────────────────────
-    # O&M = om_pct * monthly_revenue * active_months
+    # FIX 1: O&M = om_pct × CAPEX_total × (active_months / 12)
+    #         Bukan % dari revenue — Excel menggunakan CAPEX sebagai basis.
+    #         Jika tidak ada CAPEX, fallback ke revenue-based.
     opx_by_year = [0.0] * N_YEARS
     for yr in range(N_YEARS):
         m = months_per_year[yr]
-        monthly_rev_this_year = rev_by_year[yr] / m if m > 0 else 0
-        opx_by_year[yr] = inp.om_pct * monthly_rev_this_year * m
+        if capex_total > 0:
+            opx_by_year[yr] = inp.om_pct * capex_total * (m / 12)
+        else:
+            monthly_rev_this_year = rev_by_year[yr] / m if m > 0 else 0
+            opx_by_year[yr] = inp.om_pct * monthly_rev_this_year * m
     total_opex = sum(opx_by_year)
 
     # ── 5. Income Statement (Sheet COM & Resume) ───────────────────────────────
@@ -285,10 +303,10 @@ def calculate_aki(inp: AKIInput) -> dict:
     nim = total_ni / total_revenue if total_revenue > 0 else 0
 
     # ── 6. Working Capital (Sheet COM) ────────────────────────────────────────
-    # AR = (Revenue / 365) * AR_DAYS  per year
-    # AP = (COGS   / 365) * AP_DAYS  per year
-    ar_by_year = [(rev_by_year[yr] / 365) * AR_DAYS for yr in range(N_YEARS)]
-    ap_by_year = [(dir_by_year[yr] / 365) * AP_DAYS for yr in range(N_YEARS)]
+    # FIX 5: Excel menggunakan 360-day year (bukan 365) untuk konversi WC.
+    #         AP dihitung dari (COGS + OPEX), bukan COGS saja.
+    ar_by_year = [(rev_by_year[yr] / WC_DAYS_PER_YEAR) * AR_DAYS for yr in range(N_YEARS)]
+    ap_by_year = [((dir_by_year[yr] + opx_by_year[yr]) / WC_DAYS_PER_YEAR) * AP_DAYS for yr in range(N_YEARS)]
     wc_by_year = [ar_by_year[yr] - ap_by_year[yr] for yr in range(N_YEARS)]
 
     # WC change (incremental)

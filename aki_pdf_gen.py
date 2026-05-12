@@ -315,8 +315,8 @@ def generate_pdf(result: dict, aki_input) -> bytes:
         ), bg, border
 
     metrics = [
-        ("NPV  (WACC 11.35%)", f"Rp {fmt(r.get('npv'))}", bool(r.get("npv_ok")), "Minimum > 0"),
-        ("MIRR",               fmt_pct(r.get("mirr")),     bool(r.get("irr_ok")), "Minimum 13.35%"),
+        ("NPV  (WACC 11.76%)", f"Rp {fmt(r.get('npv'))}", bool(r.get("npv_ok")), "Minimum > 0"),
+        ("MIRR",               fmt_pct(r.get("mirr")),     bool(r.get("irr_ok")), "Minimum 13.76%"),
         ("Payback Period",     r.get("payback_str","—"),   bool(r.get("pp_ok")),  f"< {inp.kontrak_tahun} Tahun"),
         ("GPM",                fmt_pct(r.get("gpm")),      bool(r.get("gpm_ok")), "Minimum 7%"),
         ("NIM",                fmt_pct(r.get("nim")),      bool(r.get("nim_ok")), "Minimum 2%"),

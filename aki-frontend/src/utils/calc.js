@@ -16,7 +16,7 @@ export const readStorage = (key, fallback) => safeJson(localStorage.getItem(key)
 export const writeStorage = (key, value) => localStorage.setItem(key, JSON.stringify(value));
 
 const N_YEARS = 5;
-const WACC = 0.1135;
+const WACC = 0.1176;
 const TAX_RATE = 0.22;
 const MIN_IRR = WACC + 0.02;
 
@@ -158,11 +158,13 @@ export function calcPreview(products, kontrakBulan, capex = { material: "", jasa
   const material = parseFloat(capex?.material) || 0;
   const jasa = parseFloat(capex?.jasa) || 0;
   const capexTotal = (material + jasa) * 1.004;
-  const lifetimeYears = parseInt(capex?.lifetime_years) || 5;
-  const monthlyDep = lifetimeYears > 0 ? capexTotal / (lifetimeYears * 12) : 0;
+  const lifetimeBulan = Math.max(kontrakBulan, 1);
+  const monthlyDep = capexTotal > 0 ? capexTotal / lifetimeBulan : 0;
   const depByYear = monthsPerYear.map((m) => monthlyDep * m);
 
-  const opexByYear = revByYear.map((rev) => rev * omPct);
+  const opexByYear = capexTotal > 0
+    ? monthsPerYear.map((m) => omPct * capexTotal * (m / 12))
+    : revByYear.map((rev) => rev * omPct);
   const gpByYear = revByYear.map((r, i) => r - cogsByYear[i]);
   const ebitdaByYear = gpByYear.map((gp, i) => gp - opexByYear[i]);
   const ebitByYear = ebitdaByYear.map((v, i) => v - depByYear[i]);
