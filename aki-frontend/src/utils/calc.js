@@ -158,8 +158,8 @@ export function calcPreview(products, kontrakBulan, capex = { material: "", jasa
   const material = parseFloat(capex?.material) || 0;
   const jasa = parseFloat(capex?.jasa) || 0;
   const capexTotal = (material + jasa) * 1.004;
-  const lifetimeYears = parseInt(capex?.lifetime_years) || 5;
-  const monthlyDep = lifetimeYears > 0 ? capexTotal / (lifetimeYears * 12) : 0;
+  const lifetimeBulan = Math.max(kontrakBulan, 1);
+  const monthlyDep = capexTotal > 0 ? capexTotal / lifetimeBulan : 0;
   const depByYear = monthsPerYear.map((m) => monthlyDep * m);
 
   const opexByYear = capexTotal > 0

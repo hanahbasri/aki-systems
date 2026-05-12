@@ -232,11 +232,12 @@ def calculate_aki(inp: AKIInput) -> dict:
     total_revenue = sum(rev_by_year)
 
     # ── 2. CAPEX & Depreciation (Sheet 3. Cpx) ────────────────────────────────
-    # Template: LIFETIME = 60 bulan (5 tahun) — depresiasi atas umur aset, bukan kontrak.
-    # monthly_dep = total_investasi / (lifetime_years × 12)
+    # Depresiasi atas durasi KONTRAK, bukan umur aset.
+    # Bukti: kontrak 1 tahun → dep = 100% CAPEX; kontrak 5 tahun → dep = 20%/thn.
+    # monthly_dep = total_investasi / kontrak_total_bulan
     if inp.capex:
         capex_total = inp.capex.total_investasi
-        lifetime_bulan = max(inp.capex.lifetime_years * 12, 1)
+        lifetime_bulan = max(inp.kontrak_total_bulan, 1)
         monthly_dep = capex_total / lifetime_bulan
         dep_by_year = []
         for yr in range(N_YEARS):
