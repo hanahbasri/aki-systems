@@ -27,6 +27,7 @@
       { value: "Astinet Reguler Jabodetabek 80 Mbps", otc: 0, bulanan: 4682200, group: "Astinet Reguler Jabodetabek" },
       { value: "Astinet Reguler Jabodetabek 90 Mbps", otc: 0, bulanan: 5106600, group: "Astinet Reguler Jabodetabek" },
       { value: "Astinet Reguler Jabodetabek 100 Mbps", otc: 0, bulanan: 5531000, group: "Astinet Reguler Jabodetabek" },
+      { value: "Astinet Reguler Jabodetabek 120 Mbps", otc: 0, bulanan: 6570400, group: "Astinet Reguler Jabodetabek" },
       { value: "Astinet Reguler Jabodetabek 150 Mbps", otc: 0, bulanan: 8129500, group: "Astinet Reguler Jabodetabek" },
       { value: "Astinet Reguler Jabodetabek 200 Mbps", otc: 0, bulanan: 10728000, group: "Astinet Reguler Jabodetabek" },
       { value: "Astinet Reguler Jabodetabek 250 Mbps", otc: 0, bulanan: 12937000, group: "Astinet Reguler Jabodetabek" },
